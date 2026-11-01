@@ -5,6 +5,7 @@ import { ProfileSettingsForm } from "@/components/profile-settings-form";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { safeAuthDestination } from "@/lib/auth-destination";
 import { getPublicProfileByUsername } from "@/lib/profiles";
+import { createPublicPageMetadata } from "@/lib/seo";
 
 type PageProps = {
   params: Promise<{ slug: string[] }>;
@@ -12,6 +13,39 @@ type PageProps = {
 };
 
 function single(value: string | string[] | undefined) { return typeof value === "string" ? value : null; }
+
+export async function generateMetadata({ params }: Pick<PageProps, "params">) {
+  const { slug } = await params;
+  if (slug.length === 1 && slug[0] === "explore") {
+    return createPublicPageMetadata(
+      "Explore open-source projects",
+      "Browse project previews, developer tools, and open-source ideas on CodeBloom. Filter by topic and explore the stories behind each build.",
+      "/explore",
+    );
+  }
+
+  const routeTitles: Record<string, string> = {
+    login: "Sign in",
+    signup: "Create an account",
+    "forgot-password": "Recover your account",
+    "reset-password": "Reset your password",
+    projects: "Project preview",
+    u: "Developer profile preview",
+    communities: "Community preview",
+    dashboard: "Dashboard",
+    publish: "Share a project",
+    bookmarks: "Bookmarks",
+    notifications: "Activity",
+    messages: "Messages",
+    settings: "Settings",
+  };
+
+  return {
+    title: routeTitles[slug[0] ?? ""] ?? "Page preview",
+    description: "This CodeBloom application or preview route is not currently included in public search results.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function CatchAllPage({ params, searchParams }: PageProps) {
   const [{ slug }, search] = await Promise.all([params, searchParams]);

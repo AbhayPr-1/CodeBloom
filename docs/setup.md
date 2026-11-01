@@ -40,6 +40,7 @@ Copy `.env.example` to `.env.local` only when you need service-backed features. 
 | `SUPABASE_SERVICE_ROLE_KEY` | Only for a narrowly justified trusted server task | Privileged; server-only; not needed for normal user-scoped reads/writes. |
 | `GITHUB_TOKEN` | Optional future GitHub API adapter | Server-only; public repository reads work without it under conservative rate limits. |
 | `PLAYWRIGHT_BASE_URL` | Optional browser tests against a running app | Non-secret URL. |
+| `NEXT_PUBLIC_SITE_URL` | Production deployment only | Exact HTTPS origin with scheme + host only; enables absolute canonical/share URLs and a sitemap. Leave blank until the real public domain is known. |
 
 The normal UI, local fixtures, theme choice, and unit tests do not require Supabase or GitHub credentials. GitHub OAuth is not needed to initialize or browse the preview. If selected later, configure OAuth credentials in Supabase Auth provider settings and keep the provider secret there—not in browser code.
 

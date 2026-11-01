@@ -160,6 +160,38 @@
 .landing-join-secondary { margin-top: 12px; color: var(--subtle); font-size: 10px; }
 .landing-join-secondary a { color: var(--violet); font-weight: 700; }
 .landing-join-secondary a:hover { color: var(--text); }
+
+/* The auth flow shares the landing page's blue/violet brand glow and app surfaces. */
+.auth-public-page {
+  background:
+    radial-gradient(ellipse at 16% 26%, color-mix(in srgb, var(--blue) 10%, transparent), transparent 38%),
+    radial-gradient(ellipse at 82% 62%, color-mix(in srgb, var(--violet) 12%, var(--bg)), var(--bg) 60%);
+}
+.auth-brand .brand-icon { transition: transform 220ms cubic-bezier(.2, .7, .2, 1); }
+.auth-brand:hover .brand-icon { transform: rotate(-2deg) scale(1.05); }
+.auth-public-nav > div > a { transition: color 160ms ease; }
+.auth-public-nav > div > a:hover { color: var(--text); }
+.auth-story { animation: entry-rise .65s .05s both; }
+.auth-story-list li { transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease; }
+.auth-story-icon { transition: background-color 180ms ease, color 180ms ease, transform 180ms ease; }
+.auth-public-page .auth-panel {
+  border-color: color-mix(in srgb, var(--violet) 26%, var(--line));
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.auth-public-page .auth-panel:focus-within {
+  border-color: color-mix(in srgb, var(--violet) 58%, var(--line));
+  box-shadow: 0 20px 55px color-mix(in srgb, var(--violet) 13%, transparent);
+}
+.auth-public-page[data-auth-mode="signup"] .auth-panel-mark {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--violet) 15%, var(--surface)), color-mix(in srgb, var(--blue) 13%, var(--surface)));
+}
+.auth-input-wrap { transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease; }
+.auth-input-wrap button { transition: color 160ms ease, background-color 160ms ease, transform 160ms ease; }
+.auth-input-wrap button:hover { background: color-mix(in srgb, var(--violet) 10%, transparent); color: var(--text); }
+.auth-form-meta a, .auth-switch a { transition: color 160ms ease, text-decoration-color 160ms ease; }
+.auth-form-meta a:hover, .auth-switch a:hover { color: var(--text); }
+.auth-config-warning, .auth-form .error-banner, .auth-form .success-banner { animation: feedback-enter 220ms ease-out both; }
+
 @media (max-width: 900px) {
   .auth-content { width: min(500px, 100%); grid-template-columns: 1fr; gap: 0; padding: 16px 0 28px; }
   .auth-story { display: none; }

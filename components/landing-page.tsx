@@ -1,24 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useSyncExternalStore, useCallback, useRef } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
-import { ProjectArtwork } from "@/components/project-card";
+import { ProjectArtwork } from "@/components/project-artwork";
+import { LandingDiscovery } from "@/components/landing-discovery";
+import { LandingScrollStory } from "@/components/landing-scroll-story";
 import { projects as demoProjects, type Project } from "@/lib/demo-data";
 import { sound } from "@/components/landing-sound";
+
+const previewTopics = [...new Set(demoProjects.flatMap((project) => project.tags))];
+const subscribeToHapticSupport = () => () => {};
+const getHapticSupport = () => typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+const getServerHapticSupport = () => false;
+const storyHapticPatterns: VibratePattern[] = [[12], [9, 34, 9], [7, 22, 12, 22, 18]];
 
 export function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
 
-  // Audio state
+  // Sensory feedback is controllable and never starts audio automatically.
   const [soundEnabled, setSoundEnabled] = useState(false);
-
-  // Loader state
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
+  const hapticsAvailable = useSyncExternalStore(subscribeToHapticSupport, getHapticSupport, getServerHapticSupport);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const hapticsEnabledRef = useRef(hapticsEnabled);
 
   // Auth gate dialog state
   const [gateOpen, setGateOpen] = useState(false);
@@ -31,27 +38,32 @@ export function LandingPage() {
   const [formTask, setFormTask] = useState("");
   const [formSubmitted, setFormSubmitted] = useState(false);
 
-  // Numbers state
-  const numbersTrackRef = useRef<HTMLDivElement>(null);
-
-  // Simulated Loader (0% -> 100%)
   useEffect(() => {
-    let current = 0;
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 9) + 6;
-      if (current >= 100) {
-        current = 100;
-        setProgress(100);
-        clearInterval(interval);
-        setTimeout(() => {
-          setLoading(false);
-        }, 350);
-      } else {
-        setProgress(current);
-      }
-    }, 35);
+    const root = document.querySelector<HTMLElement>(".hw-root");
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (!root || reduceMotion || !("IntersectionObserver" in window)) return;
 
-    return () => clearInterval(interval);
+    const revealTargets = root.querySelectorAll<HTMLElement>(
+      ".scroll-story, .sw-numbers, .works, .discovery, .sw-foot, .works-card, .num",
+    );
+    if (revealTargets.length === 0) return;
+
+    root.classList.add("has-reveals");
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -5% 0px" });
+
+    revealTargets.forEach((target) => observer.observe(target));
+    return () => {
+      observer.disconnect();
+      root.classList.remove("has-reveals");
+      revealTargets.forEach((target) => target.classList.remove("is-visible"));
+    };
   }, []);
 
   function toggleAudio() {
@@ -59,42 +71,48 @@ export function LandingPage() {
     setSoundEnabled(next);
   }
 
-  function handleSkip() {
-    sound.playClick();
-    setLoading(false);
-    const contentEl = document.getElementById("content");
-    if (contentEl) {
-      contentEl.scrollIntoView({ behavior: "smooth" });
-    }
+  function toggleHaptics() {
+    const next = !hapticsEnabled;
+    hapticsEnabledRef.current = next;
+    setHapticsEnabled(next);
   }
 
-  function handleReplay() {
-    sound.playClick();
-    setLoading(true);
-    setProgress(0);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    let current = 0;
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 9) + 6;
-      if (current >= 100) {
-        current = 100;
-        setProgress(100);
-        clearInterval(interval);
-        setTimeout(() => setLoading(false), 300);
-      } else {
-        setProgress(current);
-      }
-    }, 35);
-  }
+  const handleStoryChapterChange = useCallback((chapterIndex: number) => {
+    sound.playStoryTransition(chapterIndex);
+    const pattern = storyHapticPatterns[chapterIndex];
+    if (!pattern || !hapticsEnabledRef.current || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // Vibration can be blocked by browser policy; the chapter transition remains visual.
+    }
+  }, []);
 
   function handleProtectedAction(actionName: string, destination: string) {
     if (user) {
       window.location.href = destination;
     } else {
-      sound.playClick();
       setGateAction(actionName);
       setGateReturnTo(destination);
       setGateOpen(true);
+    }
+  }
+
+  function handleTactileClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (!(event.target instanceof Element)) return;
+    const control = event.target.closest<HTMLElement>(
+      'a[href], button, input[type="button"], input[type="submit"], summary, [role="button"]',
+    );
+    if (!control || control.matches(":disabled, [aria-disabled='true']")) return;
+
+    sound.playClick();
+    if (hapticsEnabled && event.detail > 0 && typeof navigator.vibrate === "function") {
+      try {
+        navigator.vibrate(8);
+      } catch {
+        // Haptic APIs can be blocked by browser policy; visual/audio feedback remains available.
+      }
     }
   }
 
@@ -105,7 +123,8 @@ export function LandingPage() {
   }
 
   return (
-    <div className="hw-root">
+    <div className="hw-root" onClickCapture={handleTactileClick}>
+      <a className="skip-link" href="#content">Skip to content</a>
       {/* SVG Icon Symbols matching helloworlddsgn.com */}
       <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
         <symbol id="i-ne" viewBox="0 0 24 24">
@@ -117,24 +136,7 @@ export function LandingPage() {
         <symbol id="i-down" viewBox="0 0 24 24">
           <path d="M12 4v15M6 13l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </symbol>
-        <symbol id="i-redo" viewBox="0 0 24 24">
-          <path d="M19 12a7 7 0 1 1-2.05-4.95M19 4v5h-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </symbol>
       </svg>
-
-      {/* ============================================================ */}
-      {/* 1. LOADER SCREEN (Figma Blueprint: helloworlddsgn.com)        */}
-      {/* ============================================================ */}
-      <div className={`loader ${loading ? "" : "is-done"}`} id="loader" aria-live="polite">
-        <div className="loader-glow" aria-hidden="true" />
-        <div className="loader-top">
-          <span id="loader-status">Building CodeBloom</span>
-          <span>codebloom.exe</span>
-        </div>
-        <div className="loader-count">
-          <b id="loader-num">{progress}</b>%
-        </div>
-      </div>
 
       {/* ============================================================ */}
       {/* 2. TOP CHROME NAVIGATION                                     */}
@@ -160,7 +162,7 @@ export function LandingPage() {
             id="snd"
             type="button"
             aria-pressed={soundEnabled}
-            aria-label={soundEnabled ? "Mute audio" : "Turn music on"}
+            aria-label={soundEnabled ? "Turn landing and story sounds off" : "Turn landing and story sounds on"}
             onClick={toggleAudio}
           >
             <span className="snd-bars" aria-hidden="true">
@@ -172,12 +174,24 @@ export function LandingPage() {
             <span className="snd-t">sound</span>
           </button>
 
+          {hapticsAvailable && (
+            <button
+              className="snd haptic-toggle"
+              type="button"
+              aria-pressed={hapticsEnabled}
+              aria-label={hapticsEnabled ? "Turn haptic feedback off" : "Turn haptic feedback on"}
+              onClick={toggleHaptics}
+            >
+              <span aria-hidden="true">⌁</span>
+              <span className="snd-t">haptics</span>
+            </button>
+          )}
+
           {/* Theme toggle */}
           <button
             className="snd"
             type="button"
             onClick={() => {
-              sound.playClick();
               toggleTheme();
             }}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
@@ -186,10 +200,13 @@ export function LandingPage() {
           </button>
 
           {/* Authentication Links */}
-          <Link href="/login" className="top-auth-btn btn-text" onClick={() => sound.playClick()}>
+          <Link href="#trails" className="top-auth-btn btn-text top-explore-link">
+            Explore
+          </Link>
+          <Link href="/login" className="top-auth-btn btn-text">
             Sign in
           </Link>
-          <Link href="/signup" className="top-auth-btn btn-solid" onClick={() => sound.playClick()}>
+          <Link href="/signup" className="top-auth-btn btn-solid">
             Create account
           </Link>
         </div>
@@ -209,25 +226,18 @@ export function LandingPage() {
           </p>
 
           <div className="screen-actions">
-            <Link href="/signup" className="btn" onClick={() => sound.playClick()}>
+            <Link href="/signup" className="btn">
               <span>Create your account</span>
               <svg className="ico" aria-hidden="true">
                 <use href="#i-right" />
               </svg>
             </Link>
 
-            <Link href="/explore" className="btn btn-outline" onClick={() => sound.playClick()}>
+            <Link href="/explore" className="btn btn-outline">
               <span>Explore as a guest</span>
             </Link>
           </div>
         </div>
-
-        <button className="skip" id="skip" type="button" onClick={handleSkip}>
-          <span>Skip the story</span>{" "}
-          <svg className="ico" aria-hidden="true">
-            <use href="#i-down" />
-          </svg>
-        </button>
 
         <p className="hint" id="hint">
           <span>Scroll to look around</span>{" "}
@@ -239,189 +249,39 @@ export function LandingPage() {
 
       {/* ============================================================ */}
       {/* 4. SWISS EDITORIAL SHEET (.content)                          */}
-      {/*    ONE 12-column grid (.sw-grid) with shared vertical rule   */}
+      {/*    ONE 12-column grid (.sw-grid) with consistent alignment  */}
       {/* ============================================================ */}
       <div className="content" id="content">
         {/* ========================================================== */}
         {/* SECTION (01) ABOUT CODEBLOOM                               */}
         {/* ========================================================== */}
-        <section className="sw sw-about" id="about" aria-labelledby="about-title">
-          <div className="sw-hero">
-            <header className="sw-head sw-grid">
-              <p className="sw-label">
-                <span>(01)</span> About CodeBloom
-              </p>
-              <p className="sw-label sw-r">A community built for developers.</p>
-            </header>
-
-            {/* Giant display lines staggered on Swiss grid columns */}
-            <h2 className="sw-big sw-grid" id="about-title">
-              <span className="ln c1">Hey,</span>
-              <span className="ln c5">welcome to</span>
-              <span className="ln c2">CodeBloom</span>
-            </h2>
-          </div>
-
-          <div className="sw-rest">
-            <div className="sw-grid sw-intro">
-              {/* Photo / Artwork on columns 1-4 */}
-              <figure className="sw-photo">
-                <div className="sw-photo-inner">
-                  <span style={{ fontFamily: "var(--mono)", fontSize: "12px", opacity: 0.8, marginBottom: "8px" }}>
-                    CODEBLOOM // v2026.1
-                  </span>
-                  <strong style={{ fontSize: "20px", letterSpacing: "-0.02em" }}>
-                    Don&apos;t just build projects.
-                  </strong>
-                  <span style={{ fontSize: "14px", opacity: 0.85, marginTop: "4px" }}>
-                    Grow them together.
-                  </span>
-                </div>
-              </figure>
-
-              {/* Lead paragraph in the butter.video manner with flat symbol tiles between words */}
-              <p className="sw-lead">
-                CodeBloom is a place where developers come together to discover projects{" "}
-                <span className="tile ic ic-creative" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 3c.6 4.6 3.4 7.4 8 8-4.6.6-7.4 3.4-8 8-.6-4.6-3.4-7.4-8-8 4.6-.6 7.4-3.4 8-8z"
-                      fill="#fff"
-                    />
-                  </svg>
-                </span>
-                , contribute to real-world solutions{" "}
-                <span className="tile ic ic-web" aria-hidden="true">
-                  <svg viewBox="0 0 32 24">
-                    <rect x="4" y="4" width="24" height="16" rx="3" fill="none" stroke="#fff" strokeWidth="2.2" />
-                    <path d="M4 9h24" stroke="#fff" strokeWidth="2.2" />
-                    <circle cx="8" cy="6.6" r="1" fill="#fff" />
-                    <circle cx="11" cy="6.6" r="1" fill="#fff" />
-                  </svg>
-                </span>
-                , share ideas{" "}
-                <span className="tile ic ic-motion" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M9 6.5v11l9-5.5z" fill="#fff" />
-                  </svg>
-                </span>{" "}
-                and grow through collaboration{" "}
-                <span className="tile ic ic-brand" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 4l2.2 5.2L20 10l-4.3 3.8L17 20l-5-3-5 3 1.3-6.2L4 10l5.8-.8z"
-                      fill="#051727"
-                    />
-                  </svg>
-                </span>{" "}
-                for developers.{" "}
-                <span className="dim">
-                  Because the best way to become a better developer is to build something meaningful with others.
-                </span>
-              </p>
-            </div>
-
-            {/* Swiss Stats List */}
-            <ul className="sw-stats" aria-label="CodeBloom Overview">
-              <li className="sw-grid">
-                <b className="sw-num">1,420+</b>
-                <span className="sw-label">developers registered</span>
-              </li>
-              <li className="sw-grid">
-                <b className="sw-num">184+</b>
-                <span className="sw-label">projects created</span>
-              </li>
-              <li className="sw-grid">
-                <b className="sw-num">890+</b>
-                <span className="sw-label">contributions made</span>
-              </li>
-            </ul>
-
-            {/* Staggered Swiss quote */}
-            <p className="sw-quote sw-grid">
-              <span className="ln c1">
-                <span className="q">Don&apos;t just</span> <span className="q q-r">build</span>
-              </span>
-              <span className="ln c5">
-                <span className="q q-r">projects —</span>
-              </span>
-              <span className="ln c2">
-                <span className="q">grow them</span> <span className="q q-i">together</span>
-              </span>
-            </p>
-
-            <div className="sw-about-actions">
-              <Link href="/signup" className="btn" onClick={() => sound.playClick()}>
-                <span>Create your account</span>
-                <svg className="ico" aria-hidden="true">
-                  <use href="#i-right" />
-                </svg>
-              </Link>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => handleProtectedAction("share a project", "/publish")}
-              >
-                <span>Share a project</span>
-              </button>
-            </div>
-          </div>
-        </section>
+        <LandingScrollStory onChapterChange={handleStoryChapterChange} />
 
         {/* ========================================================== */}
-        {/* SECTION (02) CODEBLOOM IN NUMBERS (MESH-GRADIENT BAND)     */}
+        {/* SECTION (02) HONEST PREVIEW INVENTORY                      */}
         {/* ========================================================== */}
         <section className="sw-numbers" id="numbers" aria-labelledby="nums-title">
           <div className="nums-stage">
-            <div className="nums-track" ref={numbersTrackRef}>
+            <div className="nums-track">
               <div className="nums-intro">
                 <p className="sw-label">
-                  <span>(02)</span> In numbers · since 2026
+                  <span>(02)</span> Inside this preview
                 </p>
                 <h2 className="nums-title" id="nums-title">
-                  Growing<br />together.
+                  Start<br />exploring.
                 </h2>
+                <p className="nums-disclosure">Illustrative sample content, not live community totals.</p>
               </div>
 
               <div className="num">
                 <span className="num-i">01</span>
-                <b>1,420+</b>
-                <span className="num-l">developers</span>
+                <b>{demoProjects.length}</b>
+                <span className="num-l">sample projects</span>
               </div>
               <div className="num">
                 <span className="num-i">02</span>
-                <b>184+</b>
-                <span className="num-l">projects</span>
-              </div>
-              <div className="num">
-                <span className="num-i">03</span>
-                <b>890+</b>
-                <span className="num-l">contributions</span>
-              </div>
-              <div className="num">
-                <span className="num-i">04</span>
-                <b>340+</b>
-                <span className="num-l">collaborations</span>
-              </div>
-              <div className="num">
-                <span className="num-i">05</span>
-                <b>92+</b>
-                <span className="num-l">completed</span>
-              </div>
-              <div className="num">
-                <span className="num-i">06</span>
-                <b>520+</b>
-                <span className="num-l">ideas shared</span>
-              </div>
-              <div className="num">
-                <span className="num-i">07</span>
-                <b>48+</b>
-                <span className="num-l">libraries</span>
-              </div>
-              <div className="num">
-                <span className="num-i">08</span>
-                <b>100%</b>
-                <span className="num-l">open source</span>
+                <b>{previewTopics.length}</b>
+                <span className="num-l">preview topics</span>
               </div>
             </div>
           </div>
@@ -439,8 +299,8 @@ export function LandingPage() {
               <h2 className="works-title" id="work-title">
                 Ideas worth building.
               </h2>
-              <p className="works-sub">( curated open source · developer tools · experiments )</p>
-              <Link className="btn works-btn" href="/explore" onClick={() => sound.playClick()}>
+              <p className="works-sub">Illustrative project stories · sample data, not a live feed</p>
+              <Link className="btn works-btn" href="/explore">
                 <span>Explore all projects</span>
                 <svg className="ico" aria-hidden="true">
                   <use href="#i-right" />
@@ -456,7 +316,6 @@ export function LandingPage() {
                     href={`/projects/${project.slug}`}
                     className="works-card-art"
                     aria-label={`Explore ${project.name}`}
-                    onClick={() => sound.playClick()}
                   >
                     <ProjectArtwork project={project} />
                   </Link>
@@ -468,7 +327,7 @@ export function LandingPage() {
                     </div>
 
                     <h3 className="works-card-title">
-                      <Link href={`/projects/${project.slug}`} onClick={() => sound.playClick()}>
+                      <Link href={`/projects/${project.slug}`}>
                         {project.name}
                       </Link>
                     </h3>
@@ -485,7 +344,7 @@ export function LandingPage() {
 
                     <div className="works-card-actions">
                       <span style={{ fontSize: "12px", opacity: 0.8 }}>
-                        {project.votes} appreciations
+                        {project.votes} preview appreciations
                       </span>
 
                       <button
@@ -507,6 +366,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <LandingDiscovery />
 
         {/* ========================================================== */}
         {/* SECTION (05) JOIN THE COMMUNITY / CONTACT                  */}
@@ -539,30 +400,30 @@ export function LandingPage() {
             <li>
               <a
                 className="sw-grid"
-                href="https://github.com"
+                href="https://github.com/Abhayrajput29/CodeBloom"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <span className="sw-label">02</span>
                 <b>GitHub</b>
-                <span className="sw-note">@codebloom</span>
+                <span className="sw-note">CodeBloom on GitHub</span>
                 <svg className="ico" aria-hidden="true">
                   <use href="#i-ne" />
                 </svg>
               </a>
             </li>
             <li>
-              <Link className="sw-grid" href="/explore" onClick={() => sound.playClick()}>
+              <Link className="sw-grid" href="/explore">
                 <span className="sw-label">03</span>
                 <b>Explore</b>
-                <span className="sw-note">all community projects</span>
+                <span className="sw-note">sample project previews</span>
                 <svg className="ico" aria-hidden="true">
                   <use href="#i-ne" />
                 </svg>
               </Link>
             </li>
             <li>
-              <Link className="sw-grid" href="/signup" onClick={() => sound.playClick()}>
+              <Link className="sw-grid" href="/signup">
                 <span className="sw-label">04</span>
                 <b>Create account</b>
                 <span className="sw-note">join the garden</span>
@@ -585,13 +446,14 @@ export function LandingPage() {
 
               {formSubmitted ? (
                 <div style={{ textAlign: "center", padding: "30px 0" }}>
-                  <h4 style={{ fontSize: "28px", margin: "0 0 10px" }}>Note Received!</h4>
+                  <h4 style={{ fontSize: "28px", margin: "0 0 10px" }}>Preview complete</h4>
                   <p style={{ opacity: 0.9 }}>
-                    Thank you for reaching out, <strong>{formName || "builder"}</strong>. We look forward to building something great together.
+                    Thanks for trying the form, <strong>{formName || "builder"}</strong>. This demo did not send or save your details.
                   </p>
                 </div>
               ) : (
                 <div className="sw-fields">
+                  <p className="form-preview-note" role="note">Local preview only — nothing you enter here is sent or saved.</p>
                   <label>
                     <span>Name *</span>
                     <input
@@ -626,7 +488,7 @@ export function LandingPage() {
                     />
                   </label>
                   <button className="btn btn-ink" type="submit">
-                    <span>Send the brief</span>
+                    <span>Preview the form</span>
                     <svg className="ico" aria-hidden="true">
                       <use href="#i-right" />
                     </svg>
@@ -638,11 +500,8 @@ export function LandingPage() {
 
           <div className="sw-end sw-grid">
             <p className="sw-label">© 2026 CodeBloom</p>
-            <button className="sw-replay" id="replay" type="button" onClick={handleReplay}>
-              <span>Watch the story again</span>{" "}
-              <svg className="ico" aria-hidden="true">
-                <use href="#i-redo" />
-              </svg>
+            <button className="sw-replay" id="back-to-top" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+              <span>Back to top ↑</span>
             </button>
           </div>
 

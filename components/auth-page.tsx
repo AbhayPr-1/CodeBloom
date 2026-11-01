@@ -93,9 +93,9 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
 
   const needsEmail = mode !== "reset";
   const needsPassword = mode === "login" || mode === "signup" || mode === "reset";
-  return <main className="auth-public-page">
+  return <main className="auth-public-page" data-auth-mode={mode}>
     <header className="auth-public-nav">
-      <Link href="/" className="auth-brand" aria-label="CodeBloom home"><span className="brand-icon" aria-hidden="true"><i /><i /><i /><i /></span><span>code<span>bloom</span></span></Link>
+      <Link href="/" className="auth-brand" aria-label="CodeBloom home"><span className="brand-icon" aria-hidden="true"><i /><i /><i /><i /></span><span className="brand-name">code<span>bloom</span><small>DISCOVER · DISCUSS · BUILD UPON</small></span></Link>
       <div><button className="icon-button theme-button" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><Link href="/explore">Explore projects</Link></div>
     </header>
 

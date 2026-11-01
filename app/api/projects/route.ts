@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const input = parsed.data;
     const slugBase = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
     const slug = `${slugBase}-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
-    const { data, error } = await supabase.rpc("create_project_with_tags", {
+    const { data, error } = await supabase.rpc("create_project_draft_with_tags", {
       p_name: input.name,
       p_slug: slug,
       p_tagline: input.tagline,
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     if (error) {
       if (error.code === "42501") return NextResponse.json({ error: "Your account is not allowed to publish this project." }, { status: 403 });
-      return NextResponse.json({ error: "The project could not be saved. Check that the latest reviewed migration is applied." }, { status: 400 });
+      return NextResponse.json({ error: "The project draft could not be saved. Apply the reviewed Phase 4 migration before publishing." }, { status: 400 });
     }
     const project = data?.[0];
     if (!project) return NextResponse.json({ error: "The project was not created. Please try again." }, { status: 500 });

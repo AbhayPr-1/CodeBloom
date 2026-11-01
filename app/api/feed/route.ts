@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
-import { mapLiveProjectRows, sortLiveFeed, type LiveFeedMode, type LiveFeedSocialRows, type LiveProjectRow } from "@/lib/live-feed";
+import { mapLiveProjectRows, sortLiveFeed, type LiveFeedMode, type LiveFeedSocialRows, type LiveProjectMedia, type LiveProjectRow } from "@/lib/live-feed";
 
 const feedModes: LiveFeedMode[] = ["For you", "Hot", "New", "Top", "Rising", "Following", "Bookmarks"];
-const projectSelection = "id, owner_id, slug, name, tagline, description, repository_url, demo_url, status, created_at, profiles!projects_owner_id_fkey(username, display_name), project_tags(tag)";
+const projectSelection = "id, owner_id, slug, name, tagline, description, repository_url, demo_url, status, created_at, profiles!projects_owner_id_fkey(username, display_name), project_tags(tag), project_media(id, storage_path, alt_text, position)";
 
 export async function GET(request: Request) {
   if (!getSupabaseConfig()) return NextResponse.json({ error: "The live project feed is not configured." }, { status: 503 });
@@ -60,7 +60,24 @@ export async function GET(request: Request) {
       bookmarks: bookmarksResult.data ?? [],
       follows: followsResult.data ?? [],
     } as LiveFeedSocialRows;
-    const projects = sortLiveFeed(mapLiveProjectRows(rows, social), mode, query);
+    const mediaRows = rows.flatMap((row) => (row.project_media ?? []).map((media) => ({ ...media, project_id: row.id })));
+    const signedByPath = new Map<string, string>();
+    if (mediaRows.length) {
+      const { data: signedRows, error: signingError } = await supabase.storage.from("project-media").createSignedUrls(mediaRows.map((item) => item.storage_path), 3600);
+      if (!signingError) for (const item of signedRows ?? []) {
+        const url = item.signedUrl ?? item.signedURL;
+        if (item.path && url) signedByPath.set(item.path, url);
+      }
+    }
+    const mediaByProject = new Map<string, LiveProjectMedia[]>();
+    for (const item of mediaRows) {
+      const url = signedByPath.get(item.storage_path);
+      if (!url) continue;
+      const projectMedia = mediaByProject.get(item.project_id) ?? [];
+      projectMedia.push({ id: item.id, url, altText: item.alt_text, position: item.position });
+      mediaByProject.set(item.project_id, projectMedia);
+    }
+    const projects = sortLiveFeed(mapLiveProjectRows(rows, social).map((project) => ({ ...project, media: mediaByProject.get(project.id) ?? [] })), mode, query);
     return NextResponse.json({ projects, mode, source: "live" }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "The live feed service is unavailable." }, { status: 503 });

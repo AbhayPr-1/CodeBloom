@@ -179,3 +179,10 @@ Subscribe only to private, authenticated channels scoped to a conversation ID or
 - Test invalid UUIDs, forged user IDs, private parent joins, signed URL expiry, wrong storage paths, oversized/mismatched files, unsafe repository URLs, and open redirect attempts.
 - Verify unauthorized Realtime subscription is denied and reconnect catches up by protected database query.
 - Confirm server-only secrets are absent from client bundles and `.env.local` is ignored.
+
+
+## Phase 4 code boundary (2026-11-01)
+
+The new publish UI creates a draft first and uploads images directly through the signed-in browser Supabase client. No service-role credential is required. The private bucket's object policy binds its first folder to the project UUID and second folder to `auth.uid()`; project RLS independently enforces ownership. The metadata endpoint verifies the owner/project prefix, size, Storage MIME metadata, and actual PNG/JPEG/WebP signature, then records nonblank alt text and a unique display position. Signed image URLs are issued for one hour only after the project and media rows are readable under RLS. Public project rows become visible only after the owner-authorized publish transition. Failed submissions attempt idempotent object cleanup and remove the draft; any remaining draft stays owner-only under project RLS.
+
+The migration `20261101120000_project_media_updates.sql` is prepared but not applied. These controls have unit/static coverage only; Storage policy behavior, signed URL expiry, cleanup failure paths, and anonymous/unrelated-user RLS denial have not been remotely tested. Do not treat screenshot publishing as operational until the migration is applied to the non-production project and those cases pass.

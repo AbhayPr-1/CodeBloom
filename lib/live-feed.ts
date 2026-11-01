@@ -2,6 +2,8 @@ import type { Project } from "@/lib/demo-data";
 
 export type LiveFeedMode = "For you" | "Hot" | "New" | "Top" | "Rising" | "Following" | "Bookmarks";
 export type LiveComment = { id: string; body: string; createdAt: string; authorName: string; authorUsername: string };
+export type LiveProjectMedia = { id: string; url: string; altText: string; position: number };
+export type LiveProjectUpdate = { id: string; title: string; body: string; createdAt: string; authorName: string; authorUsername: string };
 export type LiveProject = Project & {
   id: string;
   ownerId: string;
@@ -12,6 +14,8 @@ export type LiveProject = Project & {
   followingCreator: boolean;
   recentComments: LiveComment[];
   commentsCount: number;
+  media?: LiveProjectMedia[];
+  updates?: LiveProjectUpdate[];
   live: true;
 };
 
@@ -28,6 +32,7 @@ export type LiveProjectRow = {
   created_at: string;
   profiles: { username: string; display_name: string } | { username: string; display_name: string }[] | null;
   project_tags: { tag: string }[] | null;
+  project_media?: Array<{ id: string; storage_path: string; alt_text: string; position: number }> | null;
 };
 
 export type LiveFeedSocialRows = {

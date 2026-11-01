@@ -54,6 +54,34 @@ class SoundEngine {
     this.playChirp(1200, 0.03, "triangle", 0.08);
   }
 
+  public playStoryTransition(chapterIndex: number) {
+    if (!this.enabled) return;
+
+    const motifs: ReadonlyArray<ReadonlyArray<{ frequency: number; delay: number; waveform: OscillatorType }>> = [
+      [
+        { frequency: 587.33, delay: 0, waveform: "sine" },
+        { frequency: 880, delay: 72, waveform: "sine" },
+      ],
+      [
+        { frequency: 740, delay: 0, waveform: "triangle" },
+        { frequency: 587.33, delay: 86, waveform: "sine" },
+      ],
+      [
+        { frequency: 523.25, delay: 0, waveform: "sine" },
+        { frequency: 659.25, delay: 64, waveform: "sine" },
+        { frequency: 783.99, delay: 128, waveform: "sine" },
+      ],
+    ];
+    const motif = motifs[chapterIndex];
+    if (!motif) return;
+
+    motif.forEach(({ frequency, delay, waveform }) => {
+      setTimeout(() => {
+        if (this.enabled) this.playChirp(frequency, 0.055, waveform, 0.045);
+      }, delay);
+    });
+  }
+
   public playBlip(freq = 640) {
     if (!this.enabled) return;
     this.playChirp(freq, 0.05, "sine", 0.1);

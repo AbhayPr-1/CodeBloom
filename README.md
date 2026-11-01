@@ -34,6 +34,10 @@ Public browsing and the local preview work without Supabase credentials. To use 
 
 Never expose a Supabase service-role key in browser code or in a variable prefixed with `NEXT_PUBLIC_`. Review [Setup and environment configuration](docs/setup.md) and [Security and privacy](docs/security.md) before connecting a Supabase project. Database-backed features require the appropriate migrations; the social migration and several live-service end-to-end checks are still pending. Do not treat the local preview fixtures as live community data.
 
+### Public deployment URL and SEO
+
+Set `NEXT_PUBLIC_SITE_URL` in the production environment to the exact HTTPS origin (scheme and host only, for example `https://your-real-domain.example`). This enables absolute canonical and social-preview URLs plus the sitemap. Leave it unset for local development; the app deliberately omits absolute SEO URLs rather than guessing a public domain. Only the substantive homepage and project-exploration page are currently included in the sitemap; application, auth, and client-resolved detail routes are not indexed yet.
+
 ## Development commands
 
 Run these from the project directory on any supported platform:
@@ -50,7 +54,7 @@ GitHub Actions runs the type-check, lint, unit tests, and production build on Li
 
 ## Project status
 
-The application includes a public landing and project preview, Supabase email-auth flows, profile APIs and editing, project APIs, and feed/social code. Public preview content may be fixture data. Live behavior depends on correct Supabase configuration, migrations, RLS policies, and end-to-end verification. Community membership, private chat, notification delivery, media storage, and deployment are not implemented or verified as production services.
+The application includes a public landing and project preview, Supabase email-auth flows, profile APIs and editing, draft-first project publishing, private-bucket screenshot uploads, live project detail data, and owner-authored progress updates. These Phase 4 paths depend on the reviewed migration `20261101120000_project_media_updates.sql`, which is prepared but not yet applied; live Storage/RLS behavior has not yet been verified. Public preview content may be fixture data. Project editing/deletion, the pending social migration, community membership, private chat, notification delivery, GitHub metadata, and deployment remain incomplete or unverified.
 
 ## Documentation
 

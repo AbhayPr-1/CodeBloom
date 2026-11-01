@@ -183,3 +183,15 @@
 | Reports/moderation actions | Deny | Reporter sees own report | Deny | Moderator-only queue/actions |
 
 RLS policies need SQL tests for positive and negative cases. Policies should avoid recursive policy dependencies; use carefully reviewed `SECURITY DEFINER` helpers with fixed `search_path` only when necessary. Do not grant execution of privileged functions to `public` by default.
+
+
+## Phase 4 implementation status
+
+Migration `20261101120000_project_media_updates.sql` is prepared but not applied. It implements the two tables described above with these concrete rules:
+
+- `project_media`: UUID primary key; `project_id` cascades with its project; globally unique `storage_path` constrained to a project-ID/user-ID/object-UUID path with a `.png`, `.jpg`, or `.webp` suffix; nonblank `alt_text` (1–180 characters); `position` 0–4 with unique `(project_id, position)`; and `created_at`. Public reads require a public published parent; owners may read/manage their rows.
+- `project_updates`: UUID primary key; project and author foreign keys; trimmed title 3–120 characters; trimmed body 1–4,000 characters; created/updated timestamps; indexes by project chronology and author chronology. Public reads require a public published parent; only the project owner may add/edit/delete, and the author must equal `auth.uid()`.
+- The migration creates a private `project-media` Storage bucket capped at 5 MiB per object with JPEG/PNG/WebP MIME allowlisting. Object reads require ownership or a registered media row on a public published project; insertion/deletion paths bind both project UUID and authenticated owner UUID.
+- `create_project_draft_with_tags` creates a draft and its normalized tags atomically under the caller's RLS identity. A separate owner-authorized status update publishes it after uploads are verified. It does not replace the existing Phase 3 `create_project_with_tags` RPC.
+
+Migration history reconciliation is still required before any future Supabase CLI push. No Phase 4 schema has been applied to Supabase yet.

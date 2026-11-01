@@ -22,3 +22,8 @@ The requested phase ordering is retained. Phase 4 precedes Phase 5 because feed 
 ## Scope controls
 
 Do not build every future feature during Phase 1. Avoid microservices, Redis, paid services, AI recommendations, and full Git hosting unless requirements and measured needs justify them. Use service abstractions only where there is a concrete domain boundary or reuse. Maintain the documented rule that a message request is not a conversation: ordinary messaging begins only after recipient acceptance.
+
+
+## Current checkpoint — Phase 4 in progress (2026-11-01)
+
+Code now includes draft-first project publishing, private screenshot uploads, server-side media validation, live project detail retrieval, and owner-authored project updates. The Phase 4 SQL migration is pending and has not changed the non-production database. Remaining Phase 4 exit work: reconcile migration history; apply the reviewed schema/bucket policies to the test project; exercise create/publish/detail/update and failure cleanup; verify anon/unrelated-user denial and signed URL expiry; then implement project edit/delete UX. Phase 5 remains deferred until those checks are complete.

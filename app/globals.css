@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "./entry.css";
-@import "./landing.css";
 
 :root {
   color-scheme: dark;
@@ -467,3 +466,68 @@ a.tag-chip:hover { border-color: var(--violet); color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Shared micro-interactions keep the app responsive without adding decorative motion. */
+a, button, [role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(.2, .7, .2, 1);
+}
+input, textarea, select {
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+button:not(:disabled):active, [role="button"]:active { transform: scale(.985); }
+.button:active:not(:disabled) { transform: scale(.985); }
+a:active { opacity: .86; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  transition: outline-color 160ms ease, box-shadow 160ms ease;
+}
+:is(.featured-project, .detail-card, .discussion, .rail-card, .settings-card, .list-card, .publish-form, .auth-panel):focus-within {
+  border-color: color-mix(in srgb, var(--violet) 42%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 10%, transparent);
+}
+.profile-popover { animation: surface-enter 160ms ease-out both; }
+.success-banner, .error-banner, [role="alert"] { animation: feedback-enter 220ms ease-out both; }
+@keyframes surface-enter { from { opacity: 0; transform: translateY(-5px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes feedback-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+
+/* Phase 4: project screenshots, upload selection, and owner progress updates. */
+.media-picker-label { display: flex !important; align-items: center; flex-wrap: wrap; gap: 8px; }
+.media-picker-label svg { color: var(--violet); }
+.publish-media-list { display: grid; gap: 10px; margin: 12px 0 18px; }
+.publish-media-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 1.2fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.publish-media-item > span { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.publish-media-item label { margin: 0; }
+.publish-media-item input { margin-top: 4px; }
+.project-media-section, .project-updates-section { margin-top: 16px; padding: clamp(16px, 3vw, 22px); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.project-media-section h2, .project-updates-section h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; }
+.project-media-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; margin-top: 14px; }
+.project-media-gallery figure { min-width: 0; margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.project-media-gallery img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--surface-soft); }
+.project-media-gallery figcaption { padding: 8px 10px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.project-update-form { display: grid; gap: 10px; margin: 14px 0 16px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.project-update-form label { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.project-update-form input, .project-update-form textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--bg); color: var(--text); font: inherit; font-size: 11px; }
+.project-update-form textarea { min-height: 88px; resize: vertical; }
+.project-update-form input:focus, .project-update-form textarea:focus { border-color: var(--violet); outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 13%, transparent); }
+.project-update-form .button { justify-self: start; }
+.project-update-form .success-banner, .project-update-form .error-banner { margin: 0; }
+.project-updates-list { display: grid; gap: 0; margin: 14px 0 0; padding: 0 0 0 15px; border-left: 1px solid var(--line-strong); list-style: none; }
+.project-updates-list li { position: relative; padding: 0 0 16px 12px; }
+.project-updates-list li::before { position: absolute; top: 4px; left: -19px; width: 7px; height: 7px; border: 2px solid var(--surface); border-radius: 50%; background: var(--violet); content: ""; }
+.project-updates-list article { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+.project-updates-list header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.project-updates-list h3 { margin: 0; font-size: 12px; }
+.project-updates-list time, .project-updates-list small { flex: 0 0 auto; color: var(--subtle); font-size: 9px; }
+.project-updates-list p, .project-updates-empty { margin: 8px 0; color: var(--muted); font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.project-updates-list small span { color: var(--text); font-weight: 650; }
+.project-updates-empty { margin: 14px 0 0; }
+@media (max-width: 620px) {
+  .publish-media-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .publish-media-item label { grid-column: 1 / -1; grid-row: 2; }
+}
+
+.project-art-has-image { padding: 0; background: var(--surface-soft); }
+.project-art-photo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }

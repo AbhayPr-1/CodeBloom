@@ -8,7 +8,7 @@ The interface presents CodeBloom as a modern developer community: focused, infor
 
 The design starts in dark mode and provides a complete light theme. An explicit theme choice is saved in the browser; absent a saved choice, the interface follows the operating-system appearance preference. The theme control is available in the shared header and settings page. Semantic tokens keep contrast and surfaces consistent between themes.
 
-Neutral backgrounds and surfaces support restrained violet and blue accents for actions, selection, links, and focus. Gradients and shadows are limited to subtle panel treatment; there are no glow effects or decorative animations. Project artwork is lightweight CSS illustration used only to make demo project cards scannable; it is not presented as submitted screenshots.
+Neutral backgrounds and surfaces support restrained violet and blue accents for actions, selection, links, and focus. Gradients and shadows are limited to subtle panel treatment. Product surfaces use short functional transitions for focus, hover, press, and state changes, with no decorative autoplay; the public landing page adds one-time, reduced-motion-aware section reveals, and the sign-up flow shares the same brand accents, wordmark, and surfaces. Project artwork is lightweight CSS illustration used only to make demo project cards scannable; it is not presented as submitted screenshots.
 
 ## Layout and responsive behavior
 

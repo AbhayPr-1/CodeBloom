@@ -7,25 +7,10 @@ import { ArrowDown, ArrowUp, Bookmark, ExternalLink, MessageCircle, MoreHorizont
 import { useCommunity } from "@/components/community-provider";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
+import { ProjectArtwork } from "@/components/project-artwork";
 import type { Project } from "@/lib/demo-data";
 import type { LiveProject, LiveComment } from "@/lib/live-feed";
 import { safeHttpsUrl } from "@/lib/urls";
-
-const artDetails: Record<Project["art"], { label: string; mark: string }> = {
-  garden: { label: "signal garden / inbox", mark: "◌" },
-  ledger: { label: "ledger leaf / overview", mark: "↗" },
-  terminal: { label: "patchwork / release notes", mark: "~/" },
-  atlas: { label: "little atlas / saved places", mark: "⌖" },
-  orbit: { label: "orbit notes / graph view", mark: "◎" },
-  studio: { label: "tiny studio / components", mark: "▦" },
-};
-
-export function ProjectArtwork({ project }: { project: Project }) {
-  return <div className={`project-art art-${project.art}`} aria-label={`${project.name} illustrative preview`} role="img">
-    <div className="art-window"><div className="art-window-top"><span /><span /><span /><small>{artDetails[project.art].label}</small></div><div className="art-window-content"><span className="art-mark">{artDetails[project.art].mark}</span><div className="art-lines"><i /><i /><i /></div><div className="art-mini-grid"><b /><b /><b /><b /></div></div></div>
-    <span className="art-index">CB / {project.art.slice(0, 3).toUpperCase()}</span>
-  </div>;
-}
 
 export function ProjectCard({ project, featured = false, liveProject }: { project: Project; featured?: boolean; liveProject?: LiveProject }) {
   const [vote, setVote] = useState<-1 | 0 | 1>(liveProject?.vote ?? 0);
@@ -115,7 +100,7 @@ export function ProjectCard({ project, featured = false, liveProject }: { projec
   }
 
   return <article className={`project-card${featured ? " project-card-featured" : ""}`}>
-    <ProjectArtwork project={project} />
+    <ProjectArtwork project={project} imageUrl={liveProject?.media?.[0]?.url} imageAlt={liveProject?.media?.[0]?.altText} />
     <div className="project-card-body">
       <div className="project-title-row"><div className={`avatar avatar-${project.avatarTone}`}>{project.initials}</div><div className="project-title-copy"><Link className="project-title" href={`/projects/${project.slug}`}>{project.name}</Link><span className="project-author">by <Link href={`/u/${project.handle}`}>{project.author}</Link> <span className="dot-separator">·</span> {project.time}</span></div>{liveProject && user?.id !== liveProject.ownerId && <button className="button button-quiet button-small follow-button" type="button" aria-pressed={followingLive} disabled={busyAction === "follow"} onClick={() => void toggleFollow()}>{followingLive ? <UserRoundCheck size={14} /> : <UserPlus size={14} />}{followingLive ? "Following" : "Follow"}</button>}<button className="icon-button subtle" type="button" aria-label={`More options for ${project.name}`} title="More options" onClick={() => setNotice("Additional project actions are planned; no content was changed.")}><MoreHorizontal size={19} /></button></div>
       <p className="project-tagline">{project.tagline}</p><p className="project-description">{project.description}</p>

@@ -50,3 +50,23 @@ Use kebab-case filenames, PascalCase React components, camelCase TypeScript, and
 ## Explicitly deferred
 
 Phase 3 auth/session/profile lifecycle; Phase 4 project/media management and production publishing; Phase 5 server-backed posts/comments/votes/ranking/moderation; Phase 6 GitHub API metadata; Phase 7 acceptance-gated messaging; Phase 8 search/follows/notifications/relationships; Phase 9 security/performance audit; Phase 10 deployment/release. Supabase URL/key presence alone does not establish any of these capabilities.
+
+## Landing page refresh
+
+Keep the existing CodeBloom editorial/terminal-inspired visual identity and extend its public landing page with useful paths into the project preview, project topics, and a short FAQ. Prefer content derived from the sample project fixtures; label fixture counts and showcase cards as preview data rather than real community activity. Replace the simulated blocking first-load screen with immediate content and subtle section/card reveal transitions. Add a single delegated click-feedback handler so opt-in sound and supported device vibration apply consistently to interactive controls; expose independent sound and haptic toggles, and honor reduced-motion preferences. Use no external media or new runtime dependencies.
+
+## Public landing SEO and performance
+
+Keep the landing page and `/explore` content in the initial HTML, add accurate route-specific metadata and a crawlable sitemap for only those substantive public routes, and noindex the remaining catch-all preview/authenticated routes until their detail content and status are resolved server-side. Accept an explicitly configured HTTPS production origin through `NEXT_PUBLIC_SITE_URL`; omit canonical, absolute sharing, and sitemap URLs when it is unset or invalid. Reduce the public landing route's client/CSS payload by moving its stylesheet to the route and separating static project artwork from interactive project-card dependencies. Keep social preview generation server-side and outside the landing client bundle; add no external runtime dependency.
+
+## Site-wide UI transitions and sign-up theme alignment
+
+Extend the existing interaction language with brief, consistent transitions for shared links, buttons, form fields, cards, and state feedback, plus restrained hover/focus/pressed affordances in the app shell. Preserve the current layout and authentication behavior; align the sign-up page's wordmark lockup, two-tone brand accents, panel treatment, and interactive form states with the existing dark/light theme tokens. Apply reduced-motion preferences globally so new and existing interface motion is suppressed consistently; do not add animation packages or decorative autoplay.
+
+## Scroll-led landing story
+
+Replace the static about introduction with a focused three-chapter scroll narrative: explanatory chapter copy remains in semantic HTML on the left, while a sticky, CSS-illustrated CodeBloom product scene changes to reflect the active chapter. Use a small IntersectionObserver scoped to the story to synchronize the scene; keep all core story copy visible and functional when scripting is unavailable, stack the illustration and chapters on mobile, and suppress decorative scene transitions for reduced motion. Define explicit dark and light theme tokens for the stage, faux interface, and mobile previews so contrast and surfaces remain cohesive across theme changes. On genuine chapter changes, play a short chapter-specific procedural motif and a distinctive vibration pattern, honoring existing sound/haptic controls and avoiding repeat cues for repeated observer notifications or initial load. Reuse the existing landing palette and type; do not add external media, scroll dependencies, or unsupported claims about live member activity.
+
+## Landing brand intro
+
+Precede the existing home content with a full-viewport CodeBloom wordmark and a short CSS particle-dissolve reveal. Use deterministic lightweight spans rather than a video/canvas or external asset; theme the overlay for dark and light mode. Make it skippable, run once per browser session, and bypass it for reduced-motion preferences. Keep the underlying landing content intact and inert only while the overlay is visible; the intro itself makes no sound and requests no haptics.

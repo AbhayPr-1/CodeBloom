@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowUpRight, Bell, Bookmark, Check, Compass, LogIn, MessageCircle, Plus, Search,
-  Send, Settings2, Users,
+  ArrowUpRight, Bell, Bookmark, Compass, LogIn, MessageCircle, Plus, Search,
+  Settings2, Users,
 } from "lucide-react";
-import { ProjectCard, ProjectArtwork } from "@/components/project-card";
+import { ProjectCard } from "@/components/project-card";
+import { ProjectArtwork } from "@/components/project-artwork";
 import { DashboardWelcome } from "@/components/dashboard-welcome";
 import { useCommunity } from "@/components/community-provider";
 import { useTheme } from "@/components/theme-provider";
@@ -19,7 +20,8 @@ import { sortLiveFeed, type LiveFeedMode, type LiveProject } from "@/lib/live-fe
 import { safeGitHubRepositoryUrl, safeHttpsUrl } from "@/lib/urls";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
-import { getSupabaseConfig } from "@/lib/supabase/config";
+import { ProjectPublishForm } from "@/components/project-publish-form";
+import { ProjectLiveSections } from "@/components/project-live-sections";
 import type { PublicProfile } from "@/lib/validation/profiles";
 
 const emptyLiveProjects: LiveProject[] = [];
@@ -70,44 +72,7 @@ export function FeedView({ mode = "home", initialQuery = "", authConfirmed = fal
 }
 
 export function PublishView() {
-  const { publish } = useCommunity();
-  const supabaseConfigured = Boolean(getSupabaseConfig());
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [error, setError] = useState("");
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const name = String(data.get("name") ?? "").trim();
-    const payload = {
-      name,
-      tagline: String(data.get("tagline") ?? "").trim(),
-      description: String(data.get("description") ?? "").trim(),
-      repositoryUrl: String(data.get("repo") ?? "").trim(),
-      tags: String(data.get("tags") ?? "").split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5),
-    };
-    if (!name) return;
-    setError("");
-    setStatus("saving");
-
-    try {
-      if (supabaseConfigured) {
-        const response = await fetch("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-        const body = await response.json() as { error?: string };
-        if (!response.ok) throw new Error(body.error ?? "Unable to publish this project. Check your sign-in and Supabase setup.");
-      } else {
-        publish({ ...payload, repo: payload.repositoryUrl });
-      }
-      form.reset();
-      setStatus("saved");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong. Please try again.");
-      setStatus("idle");
-    }
-  }
-
-  return <section className="form-page"><PageHeading eyebrow="BUILD IN PUBLIC" title="Share your project" description="Give people enough context to understand what you made and how they can explore it." />{status === "saved" && <p className="success-banner" role="status"><Check size={17} /> {process.env.NEXT_PUBLIC_SUPABASE_URL ? "Project submitted. Its visibility follows your configured account and database policies." : "Project added to this browser preview only."}</p>}{error && <p className="error-banner" role="alert">{error}</p>}<form className="publish-form" onSubmit={submit}><label>Project name<input required name="name" maxLength={80} minLength={2} placeholder="Signal Garden" /></label><label>One-line description<input required name="tagline" maxLength={140} minLength={8} placeholder="A calmer way to understand notifications." /></label><label>What are you building?<textarea required name="description" maxLength={2000} minLength={20} placeholder="Share the problem, your approach, and what makes it useful." rows={6} /></label><div className="two-up"><label>GitHub repository<input required name="repo" type="url" pattern="https://github\.com/.*" title="Use an HTTPS github.com repository URL" placeholder="https://github.com/you/project" /></label><label>Topics<input required name="tags" placeholder="TypeScript, Next.js, Open source" /></label></div><p className="form-hint">Add up to five comma-separated topics. A GitHub repository URL is required.</p><div className="form-actions"><Link className="button button-outline" href="/">Cancel</Link><button className="button button-primary" type="submit" disabled={status === "saving"}>{status === "saving" ? <span className="spinner" aria-hidden="true" /> : <Send size={16} />}{status === "saving" ? "Publishing…" : "Publish project"}</button></div></form><PreviewNote>{process.env.NEXT_PUBLIC_SUPABASE_URL ? "This form requires an authenticated Supabase user and the reviewed project migration to be applied. A live publish has not been verified." : "Without Supabase configuration, projects are stored in this browser only and will not be visible to anyone else."}</PreviewNote></section>;
+  return <ProjectPublishForm />;
 }
 
 export function ProjectDetail({ slug }: { slug: string }) {
@@ -138,7 +103,7 @@ export function ProjectDetail({ slug }: { slug: string }) {
   if (!project) return <EmptyState icon={<Compass size={24} />} title="Project not found" description="This project may have moved or is not included in the live feed or preview." action={<Link className="button button-primary" href="/explore">Explore projects</Link>} />;
   const repositoryUrl = safeGitHubRepositoryUrl(project.repo);
   const demoUrl = project.demo ? safeHttpsUrl(project.demo) : null;
-  if (liveProject) return <section className="detail-page"><Link className="back-link" href="/dashboard"><ArrowUpRight size={14} /> Back to dashboard</Link><PageHeading eyebrow="LIVE COMMUNITY PROJECT" title={liveProject.name} description={liveProject.tagline} /><ProjectCard project={liveProject} liveProject={liveProject} /><article className="detail-card"><p className="detail-description">{liveProject.description}</p><dl><div><dt>Live score</dt><dd>{liveProject.score}</dd></div><div><dt>Comments</dt><dd>{liveProject.commentsCount}</dd></div><div><dt>Topics</dt><dd>{liveProject.tags.length}</dd></div></dl><div className="project-tags" aria-label="Project topics">{liveProject.tags.map((tag) => <Link className="tag-chip" href={`/explore?q=${encodeURIComponent(tag)}`} key={tag}>#{tag}</Link>)}</div><div className="detail-links">{repositoryUrl && <a className="button button-outline" href={repositoryUrl} target="_blank" rel="noopener noreferrer">View source <ArrowUpRight size={15} /></a>}{demoUrl && <a className="text-link" href={demoUrl} target="_blank" rel="noopener noreferrer">Live demo <ArrowUpRight size={14} /></a>}</div></article></section>;
+  if (liveProject) return <section className="detail-page"><Link className="back-link" href="/dashboard"><ArrowUpRight size={14} /> Back to dashboard</Link><PageHeading eyebrow={liveProject.status === "Published" ? "LIVE COMMUNITY PROJECT" : "YOUR PROJECT DRAFT"} title={liveProject.name} description={liveProject.tagline} /><ProjectCard project={liveProject} liveProject={liveProject} /><article className="detail-card"><p className="detail-description">{liveProject.description}</p><dl><div><dt>Live score</dt><dd>{liveProject.score}</dd></div><div><dt>Comments</dt><dd>{liveProject.commentsCount}</dd></div><div><dt>Topics</dt><dd>{liveProject.tags.length}</dd></div></dl><div className="project-tags" aria-label="Project topics">{liveProject.tags.map((tag) => <Link className="tag-chip" href={`/explore?q=${encodeURIComponent(tag)}`} key={tag}>#{tag}</Link>)}</div><div className="detail-links">{repositoryUrl && <a className="button button-outline" href={repositoryUrl} target="_blank" rel="noopener noreferrer">View source <ArrowUpRight size={15} /></a>}{demoUrl && <a className="text-link" href={demoUrl} target="_blank" rel="noopener noreferrer">Live demo <ArrowUpRight size={14} /></a>}</div></article><ProjectLiveSections project={liveProject} /></section>;
   return <section className="detail-page"><Link className="back-link" href="/explore"><ArrowUpRight size={14} /> Back to explore</Link><PageHeading eyebrow={`${project.status.toUpperCase()} · PREVIEW PROJECT`} title={project.name} description={project.tagline} action={<button className="button button-outline" type="button" onClick={() => { if (!user) { setGateOpen(true); return; } toggleBookmark(project.slug); setNotice("Bookmark saved to this browser preview only."); }} aria-pressed={bookmarked.includes(project.slug)}><Bookmark size={16} fill={bookmarked.includes(project.slug) ? "currentColor" : "none"} /> {bookmarked.includes(project.slug) ? "Saved" : "Save project"}</button>} /><div className="detail-art"><ProjectArtwork project={project} /></div><article className="detail-card"><div className="detail-author"><span className={`avatar avatar-${project.avatarTone}`}>{project.initials}</span><span>Built by <Link href={`/u/${project.handle}`}>{project.author}</Link><small>@{project.handle} · {project.time}</small></span><span className={`status-pill status-${project.statusTone}`}><i />{project.status}</span></div><p className="detail-description">{project.description}</p><dl><div><dt>Preview appreciations</dt><dd>{project.votes}</dd></div><div><dt>Conversations</dt><dd>{project.comments}</dd></div><div><dt>Topics</dt><dd>{project.tags.length}</dd></div></dl><div className="project-tags" aria-label="Project topics">{project.tags.map((tag) => <Link className="tag-chip" href={`/communities/${encodeURIComponent(tag.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`} key={tag}>#{tag}</Link>)}</div><div className="detail-links">{repositoryUrl && <a className="button button-outline" href={repositoryUrl} target="_blank" rel="noopener noreferrer">View source <ArrowUpRight size={15} /></a>}{demoUrl && <a className="text-link" href={demoUrl} target="_blank" rel="noopener noreferrer">Live demo <ArrowUpRight size={14} /></a>}</div></article>{notice && <p className="preview-feedback" role="status">{notice}</p>}<section className="discussion" id="discussion"><div className="section-title-row"><h2><MessageCircle size={19} /> Discussion</h2><span className="preview-tag">Preview</span></div><p>Project discussion will appear here when comments and server-side authorization are implemented. For now, explore the project and its source code.</p><Link className="button button-outline" href={`/login?next=${encodeURIComponent(`/projects/${slug}#discussion`)}`}><LogIn size={15} /> Sign in to join later</Link></section><PreviewNote>Project content, totals, and activity on this page are illustrative local data.</PreviewNote><AuthGateDialog open={gateOpen} onClose={() => setGateOpen(false)} action="save this project" returnTo={pathname} /></section>;
 }
 

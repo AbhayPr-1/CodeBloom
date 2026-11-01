@@ -1,0 +1,123 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+
+export type IntroPhase = "intro" | "dissolving" | "done";
+
+const INTRO_SEEN_KEY = "codebloom:brand-intro-v1";
+
+function subscribeToIntroBypass(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  media?.addEventListener?.("change", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    media?.removeEventListener?.("change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function getIntroBypass() {
+  if (typeof window === "undefined") return false;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return true;
+  try {
+    return window.sessionStorage.getItem(INTRO_SEEN_KEY) === "seen";
+  } catch {
+    return false;
+  }
+}
+
+const getServerIntroBypass = () => false;
+
+const particles = Array.from({ length: 96 }, (_, index) => {
+  const column = index % 12;
+  const row = Math.floor(index / 12);
+  const angle = index * 2.399963;
+  const distance = 160 + (index % 7) * 48;
+  const style = {
+    left: `${((column + 0.5) / 12) * 100}%`,
+    top: `${((row + 0.5) / 8) * 100}%`,
+    "--dust-x": `${Math.cos(angle) * distance}px`,
+    "--dust-y": `${Math.sin(angle) * distance}px`,
+    "--dust-delay": `${(index % 9) * 18}ms`,
+    "--dust-size": `${2 + (index % 3)}px`,
+    "--dust-hue": `${190 + (index % 7) * 24}deg`,
+  } as CSSProperties;
+
+  return { index, style };
+});
+
+export function useLandingIntro() {
+  const bypassIntro = useSyncExternalStore(subscribeToIntroBypass, getIntroBypass, getServerIntroBypass);
+  const [phase, setPhase] = useState<IntroPhase>("intro");
+  const timers = useRef<number[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current = [];
+  }, []);
+
+  const completeIntro = useCallback(() => {
+    clearTimers();
+    setPhase("done");
+    try {
+      window.sessionStorage.setItem(INTRO_SEEN_KEY, "seen");
+    } catch {
+      // A blocked session store should not prevent the intro from completing.
+    }
+  }, [clearTimers]);
+
+  useEffect(() => {
+    if (bypassIntro) return;
+
+    timers.current = [
+      window.setTimeout(() => setPhase("dissolving"), 1120),
+      window.setTimeout(completeIntro, 2380),
+    ];
+    return clearTimers;
+  }, [bypassIntro, clearTimers, completeIntro]);
+
+  const introVisible = !bypassIntro && phase !== "done";
+  useEffect(() => {
+    if (!introVisible) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [introVisible]);
+
+  const skipIntro = useCallback(() => {
+    if (!introVisible) return;
+    setPhase("dissolving");
+    clearTimers();
+    timers.current = [window.setTimeout(completeIntro, 260)];
+  }, [clearTimers, completeIntro, introVisible]);
+
+  return { phase: bypassIntro ? "done" : phase, introVisible, skipIntro };
+}
+
+export function LandingIntroOverlay({ phase, onSkip }: { phase: IntroPhase; onSkip: () => void }) {
+  if (phase === "done") return null;
+
+  return (
+    <div className={`brand-intro${phase === "dissolving" ? " is-dissolving" : ""}`}>
+      <div className="brand-intro-content">
+        <p className="brand-intro-kicker" aria-hidden="true">A place for ideas to take root</p>
+        <div className="brand-intro-word-wrap">
+          <span className="brand-intro-word" aria-hidden="true">
+            <span>Code</span><span className="brand-intro-bloom">Bloom</span>
+          </span>
+          <span className="brand-intro-announcement" role="status" aria-live="polite" aria-atomic="true">CodeBloom</span>
+          <span className="brand-intro-particles" aria-hidden="true">
+            {particles.map(({ index, style }) => <i className="brand-intro-particle" key={index} style={style} />)}
+          </span>
+        </div>
+        <p className="brand-intro-subtitle" aria-hidden="true">DISCOVER · BUILD · GROW</p>
+      </div>
+      <button className="brand-intro-skip" type="button" onClick={onSkip}>
+        <span>Skip intro</span><span aria-hidden="true">↗</span>
+      </button>
+    </div>
+  );
+}

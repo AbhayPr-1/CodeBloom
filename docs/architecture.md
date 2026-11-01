@@ -146,3 +146,10 @@ Local secrets belong in ignored `.env.local`; deployment secrets belong in provi
 5. Add accepted-request messaging only after transactional RPC/RLS and Realtime isolation tests exist.
 
 This document specifies architecture, not a claim that these features or policies are already implemented.
+
+
+## Phase 4 implementation checkpoint (2026-11-01)
+
+The project-publish path is now draft-first: the authenticated browser asks a Next.js Route Handler to create project/tag rows through a user-scoped `SECURITY INVOKER` RPC, uploads up to five images directly to a private `project-media` bucket using its Supabase Auth session, then registers metadata and requests publication. The metadata handler checks owner-scoped object paths, object size/MIME metadata, and PNG/JPEG/WebP file signatures before inserting `project_media`; the project status changes to `published` only after these steps succeed. On failure the UI attempts to remove uploaded objects and delete the still-private draft. Project detail requests rely on PostgreSQL RLS, sign eligible media for one hour, and return owner-authored `project_updates`; update creation is authenticated and owner-only.
+
+No service-role key is used. The additive migration `20261101120000_project_media_updates.sql` defines the RLS, Storage policies, bucket, tables, and draft RPC, but it has **not been applied**. Accordingly this is an implementation contract, not a claim of live storage/database verification. Project edit/delete UX, signed-URL expiry behavior, and end-to-end/negative RLS tests remain outstanding.
