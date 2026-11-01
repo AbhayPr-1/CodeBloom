@@ -2,11 +2,11 @@
   "name": "codebloom",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=20.9.0"
   },
   "scripts": {
+    "postinstall": "node scripts/prepare-env.mjs",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",

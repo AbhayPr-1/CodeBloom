@@ -7,20 +7,21 @@ Thanks for helping improve CodeBloom. Before opening a pull request, check exist
 Follow the cross-platform instructions in the [README](README.md#run-locally-on-windows-macos-or-linux). The short version is to install Git and Node.js 20.9+, clone the repository, then run:
 
 ```sh
-node scripts/install.mjs --start
+npm install
+npm run dev
 ```
 
-For later sessions, use `pnpm dev`. Public preview pages work without Supabase credentials. Do not connect experiments to production services or run database migrations against a production database.
+Public preview pages work without Supabase credentials. Do not connect experiments to production services or run database migrations against a production database.
 
 ## Before submitting
 
 Run the project checks from the repository root:
 
 ```sh
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
 Keep changes focused, add or update tests when behavior changes, and update documentation when setup or user-visible behavior changes. CI verifies the checks on Linux, macOS, and Windows.

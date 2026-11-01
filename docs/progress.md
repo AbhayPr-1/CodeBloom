@@ -12,21 +12,23 @@
 - Preview screens for publishing, notifications, messages, communities, and settings. Pending requests do not open ordinary conversations; private messaging remains unavailable.
 - Accessible loading, error, success, empty and not-found treatments; reduced-motion styles; external link parsing restricted to HTTPS and GitHub repository URLs.
 - Route manifest and focused tests for routes, preview sorting, project input validation, and external URLs.
-- Cross-platform `scripts/install.mjs` bootstrap uses pinned pnpm and frozen-lockfile installation, preserves `.env.local`, and initializes it from the safe template only when absent. `.github/workflows/ci.yml` automates validation on pushes and pull requests.
+- `npm install` installs locked dependencies and initializes `.env.local` from the safe template only when it is absent. `.github/workflows/ci.yml` automates npm-based validation on pushes and pull requests.
 - Public root landing with project previews, topic links, How-it-works section, CTA, theme support and responsive motion-reduced layout; signed-in visits route to the dashboard while guest Explore/project/profile pages remain open. Signup/login use a shared responsive story/form layout, matching-password validation, safe return destinations, and a first-run dashboard guide after signup or email confirmation.
 - Supabase email sign-in/sign-up, confirmation callback, recovery/reset, safe return paths, client session subscription and sign-out; server `auth.getUser()` guards dashboard, publish, personal pages, and an authenticated project-creation API.
 - Guest social controls keep the accessible sign-in/create-account prompt. Signed-in project votes, bookmarks, creator follows, and comments now have validated API contracts and RLS-backed storage in the pending social migration; the live mutations have not yet been exercised against Supabase. Community membership and chat remain unimplemented.
 - `/settings/profile` is linked from the signed-in account menu and shell; `GET/PATCH /api/profile` verifies the server user, restricts writable profile fields, and the public `/u/:username` route prefers allowlisted live Supabase fields over clearly labelled preview fixtures.
 - A follow-up migration hardens profile creation, backfills accounts predating the trigger, limits profile column updates, enforces HTTPS GitHub/demo URLs for new/updated project rows, and adds `create_project_with_tags` as an authenticated `SECURITY INVOKER` transaction. On 2026-10-28 the user ran it against the configured non-production project through `scripts/apply_phase3_followup.py`; their terminal reported successful commit and postconditions. Direct SQL did not add a Supabase CLI migration-history entry. The runner uses dry-run default, test-project-ref checks, TLS, one transaction, and postconditions.
 
-## Automated validation (current tree, 2026-10-30)
+## Automated validation (current tree, 2026-11-01)
 
-- `pnpm typecheck` — passed.
-- `pnpm lint` — passed.
-- `pnpm test` — 12 files, 49 tests passed, including live feed mapping, feed/action API authorization, social mutation payloads, auth journey, and safe redirect coverage.
-- `pnpm build` — passed with the Webpack production builder; Next detected `/api/feed`, `/api/social`, and `/api/projects/[slug]`.
+- `npm ci --no-audit --no-fund` — passed from the committed npm lockfile; the post-install hook preserved the existing `.env.local`.
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm test` — 12 files, 49 tests passed, including live feed mapping, feed/action API authorization, social mutation payloads, auth journey, and safe redirect coverage.
+- `npm run build` — passed with the Webpack production builder; Next detected `/api/feed`, `/api/social`, and `/api/projects/[slug]`.
+- `npm run dev` — started successfully; `GET /` returned HTTP 200.
 
-Earlier frontend smoke checks against a built preview passed for landing/signup, confirmation and password mismatch handling, signed-out dashboard redirect, and 390px layouts. The browser smoke pass for this live-feed change could not run: local policy denied loopback bind/connect to port 3000. No signup or live social action was submitted, and no new database row was created. The prior real test-account email-confirmation/callback/session check remains valid. `node scripts/install.mjs` previously completed from cache; clean clone, GitHub Actions, and Vercel deployment remain unverified. The temporary preview is stopped.
+Earlier frontend smoke checks against a built preview passed for landing/signup, confirmation and password mismatch handling, signed-out dashboard redirect, and 390px layouts. No signup or live social action was submitted, and no new database row was created. The prior real test-account email-confirmation/callback/session check remains valid. GitHub Actions and Vercel deployment remain unverified. The temporary preview is stopped.
 
 `scripts/apply_phase3_followup.py`: Python syntax/help, migration-boundary, direct/pooler project-ref, and refusal guards passed. `psycopg` 3.3.6 is installed in the ignored `.work/tools/phase3-db-venv`. On 2026-10-28 the user ran the hidden-prompt preflight and then the apply command. Their terminal reported “Migration applied and committed successfully; all post-apply checks passed.” The connection URI/password was not saved in the repository. This was direct SQL execution and did not add a Supabase CLI migration-history entry.
 

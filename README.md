@@ -8,25 +8,22 @@ CodeBloom is a project-centered developer community for discovering software, sh
 
 ### Requirements
 
-Install [Git](https://git-scm.com/downloads) and [Node.js 20.9 or later](https://nodejs.org/en/download). The project pins pnpm `12.11.2`; the setup script uses Corepack when available and otherwise requires that exact pnpm version. If you need to install pnpm yourself, run:
+Install [Git](https://git-scm.com/downloads) and [Node.js 20.9 or later](https://nodejs.org/en/download).
 
-```sh
-npm install --global pnpm@12.11.2
-```
-
-### One-command setup and start
+### Install and start
 
 Open Terminal on macOS/Linux or PowerShell on Windows, then run these same commands:
 
 ```sh
 git clone https://github.com/Abhayrajput29/CodeBloom.git
 cd CodeBloom
-node scripts/install.mjs --start
+npm install
+npm run dev
 ```
 
-The script installs the locked dependencies, creates `.env.local` from `.env.example` only when `.env.local` does not already exist, and starts the development server. It never overwrites an existing local environment file. When the server reports it is ready, open [http://localhost:3000](http://localhost:3000). Press **Ctrl+C** in the terminal to stop it.
+`npm install` installs the locked dependencies and creates `.env.local` from `.env.example` only when `.env.local` does not already exist. It never overwrites an existing local environment file. When the server reports it is ready, open [http://localhost:3000](http://localhost:3000). Press **Ctrl+C** in the terminal to stop it.
 
-After the first setup, start the server directly with `pnpm dev`. To install dependencies and prepare `.env.local` without starting the server, use `node scripts/install.mjs`. The first installation requires access to the package registry.
+The first installation requires access to the package registry.
 
 ### Optional Supabase configuration
 
@@ -43,11 +40,11 @@ Set `NEXT_PUBLIC_SITE_URL` in the production environment to the exact HTTPS orig
 Run these from the project directory on any supported platform:
 
 ```sh
-pnpm dev        # start the local development server
-pnpm typecheck  # TypeScript check
-pnpm lint       # ESLint
-pnpm test       # unit tests
-pnpm build      # production build
+npm run dev        # start the local development server
+npm run typecheck  # TypeScript check
+npm run lint       # ESLint
+npm test           # unit tests
+npm run build      # production build
 ```
 
 GitHub Actions runs the type-check, lint, unit tests, and production build on Linux, macOS, and Windows for pushes, pull requests, and manual dispatch. It does not deploy the app and does not require secrets. See [Contributing](CONTRIBUTING.md) before opening a pull request.

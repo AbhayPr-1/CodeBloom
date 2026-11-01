@@ -6,17 +6,18 @@ The repository contains a Next.js App Router application, strict TypeScript, Tai
 
 ## Clone, install, and run
 
-Install Git and Node.js 20.9 or later on Windows, macOS, or Linux. The bootstrap uses Corepack when available; otherwise it requires the pinned pnpm version `12.11.2`. If needed, install it with `npm install --global pnpm@12.11.2`.
+Install Git and Node.js 20.9 or later on Windows, macOS, or Linux.
 
 The commands below are the same in macOS/Linux shells and Windows PowerShell:
 
 ```sh
 git clone https://github.com/Abhayrajput29/CodeBloom.git
 cd CodeBloom
-node scripts/install.mjs --start
+npm install
+npm run dev
 ```
 
-The Node bootstrap runs `pnpm install --frozen-lockfile`, creates `.env.local` from `.env.example` only if it does not already exist, and then starts the local development server. Existing local credentials are preserved. Open [http://localhost:3000](http://localhost:3000) and press Ctrl+C in the terminal to stop the server. For a later quick start after dependencies are installed, run `pnpm dev`. To install dependencies and prepare `.env.local` without starting the server, run `node scripts/install.mjs`.
+`npm install` installs the locked dependencies and creates `.env.local` from `.env.example` only if it does not already exist. Existing local credentials are preserved. Open [http://localhost:3000](http://localhost:3000) and press Ctrl+C in the terminal to stop the server.
 
 The first dependency installation needs access to the package registry. No Supabase or GitHub credentials are needed to browse local fixtures.
 
@@ -85,15 +86,15 @@ The project form uses `POST /api/projects` when the Supabase URL and publishable
 ## Validation
 
 ```sh
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
-The production build script uses `next build --webpack`. See `docs/progress.md` for the current test count/check results. Run a local dev server with `pnpm dev`; `GET /manus-routes.json` should return the current page route inventory. Do not include API endpoints or assets in that UI route inventory.
+The production build script uses `next build --webpack`. See `docs/progress.md` for the current test count/check results. Run a local dev server with `npm run dev`; `GET /manus-routes.json` should return the current page route inventory. Do not include API endpoints or assets in that UI route inventory.
 
-`node scripts/install.mjs` completed in the current checkout and preserved the existing `.env.local`; pnpm reused 438 cached packages and downloaded none. This verifies the bootstrap path against the current frozen lockfile but is not a clean-clone or new-package download test. `pnpm-workspace.yaml` continues to deny the `unrs-resolver` build script. The GitHub Actions workflow has been added but cannot run until the repository exists on GitHub.
+The setup uses npm's committed `package-lock.json`; the post-install hook preserves any existing `.env.local` and initializes it from the safe template when absent. The GitHub Actions workflow runs the same npm checks on pushes and pull requests.
 
 ## Configuration required before production use
 

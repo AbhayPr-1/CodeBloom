@@ -8,10 +8,10 @@ Describe the change and why it is needed.
 
 ## Verification
 
-- [ ] `pnpm typecheck`
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
+- [ ] `npm run typecheck`
+- [ ] `npm run lint`
+- [ ] `npm test`
+- [ ] `npm run build`
 
 ## Safety
 
