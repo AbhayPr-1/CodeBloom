@@ -25,16 +25,11 @@ npm run dev
 
 The first installation requires access to the package registry.
 
-### MongoDB Atlas configuration
+### Optional Supabase configuration
 
-Public browsing and the local preview work without database credentials. To use the full authentication and database features, add `MONGODB_URI` and `AUTH_SECRET` to `.env.local`:
+Public browsing and the local preview work without Supabase credentials. To use the service-backed authentication and database features, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to `.env.local` (the legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` is also supported). Configure Supabase Email Auth and allow the local callback URLs `http://localhost:3000/auth/callback` and `http://127.0.0.1:3000/auth/callback`.
 
-```env
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.qndvdch.mongodb.net/codebloom?retryWrites=true&w=majority
-AUTH_SECRET=your-secure-32-byte-secret
-```
-
-With MongoDB Atlas configured, user accounts, profiles, projects, votes, bookmarks, comments, and project updates are all stored and queried directly from MongoDB Atlas collections. Passwords are securely hashed with bcrypt and sessions are maintained via secure HTTP-only cookies.
+Never expose a Supabase service-role key in browser code or in a variable prefixed with `NEXT_PUBLIC_`. Review [Setup and environment configuration](docs/setup.md) and [Security and privacy](docs/security.md) before connecting a Supabase project. Database-backed features require the appropriate migrations; the social migration and several live-service end-to-end checks are still pending. Do not treat the local preview fixtures as live community data.
 
 ### Public deployment URL and SEO
 
@@ -72,4 +67,4 @@ The application includes a public landing and project preview, Supabase email-au
 
 ## Stack
 
-Next.js App Router, React, strict TypeScript, Tailwind CSS 4, Lucide, MongoDB Atlas (`mongodb`), bcryptjs, and Zod.
+Next.js App Router, React, strict TypeScript, Tailwind CSS 4, Lucide, Supabase SSR/browser clients, and Zod.
