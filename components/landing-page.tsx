@@ -8,6 +8,7 @@ import { AuthGateDialog } from "@/components/auth-gate-dialog";
 import { ProjectArtwork } from "@/components/project-artwork";
 import { LandingDiscovery } from "@/components/landing-discovery";
 import { LandingScrollStory } from "@/components/landing-scroll-story";
+import { LandingHeroInteractive } from "@/components/landing-hero-interactive";
 import { projects as demoProjects, type Project } from "@/lib/demo-data";
 import { sound } from "@/components/landing-sound";
 
@@ -212,6 +213,7 @@ export function LandingPage() {
         </div>
       </header>
 
+      <LandingHeroInteractive />
       {/* ============================================================ */}
       {/* 3. RETRO INTRO / STORY MONITOR STAGE                         */}
       {/* ============================================================ */}
@@ -460,6 +462,7 @@ export function LandingPage() {
                       type="text"
                       name="name"
                       autoComplete="name"
+                      suppressHydrationWarning
                       required
                       placeholder="Your Name *"
                       value={formName}
@@ -472,6 +475,7 @@ export function LandingPage() {
                       type="text"
                       name="contact"
                       required
+                      suppressHydrationWarning
                       placeholder="Telegram / GitHub / Email *"
                       value={formContact}
                       onChange={(e) => setFormContact(e.target.value)}

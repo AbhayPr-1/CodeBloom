@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/auth";
+import { getUsersCollection } from "@/lib/mongodb/collections";
+import { isMongoConfigured } from "@/lib/mongodb/client";
 import { profileUpdateSchema } from "@/lib/validation/profiles";
 
-function profileResponse(row: { id: string; username: string; display_name: string; bio: string | null; created_at: string; updated_at: string }) {
+function profileResponse(row: {
+  id: string;
+  username: string;
+  displayName: string;
+  bio?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}) {
   return {
     id: row.id,
     username: row.username,
-    displayName: row.display_name,
+    displayName: row.displayName,
     bio: row.bio ?? "",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -23,33 +32,43 @@ function originIsAllowed(request: Request) {
   }
 }
 
-async function authenticatedClient() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  return error || !data.user ? null : { supabase, user: data.user };
-}
-
 export async function GET() {
+  if (!isMongoConfigured()) {
+    return NextResponse.json({ error: "Profile service is unavailable." }, { status: 503 });
+  }
+
   try {
-    const session = await authenticatedClient();
-    if (!session) return NextResponse.json({ error: "Sign in to view your profile." }, { status: 401 });
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Sign in to view your profile." }, { status: 401 });
+    }
 
-    const { data, error } = await session.supabase
-      .from("profiles")
-      .select("id, username, display_name, bio, created_at, updated_at")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    const users = await getUsersCollection();
+    const doc = await users.findOne({
+      $or: [{ id: user.id }, { _id: user.id }],
+    });
 
-    if (error) return NextResponse.json({ error: "Unable to load your profile." }, { status: 503 });
-    if (!data) return NextResponse.json({ error: "Your profile is not available. Check that the profiles migration is applied." }, { status: 404 });
-    return NextResponse.json({ profile: profileResponse(data) }, { headers: { "Cache-Control": "private, no-store" } });
+    if (!doc) {
+      return NextResponse.json({ error: "Your profile is not available." }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      { profile: profileResponse(doc) },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch {
     return NextResponse.json({ error: "Profile service is unavailable." }, { status: 503 });
   }
 }
 
 export async function PATCH(request: Request) {
-  if (!originIsAllowed(request)) return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  if (!originIsAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
+  if (!isMongoConfigured()) {
+    return NextResponse.json({ error: "Profile service is unavailable." }, { status: 503 });
+  }
 
   let input: ReturnType<typeof profileUpdateSchema.parse>;
   try {
@@ -59,20 +78,47 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const session = await authenticatedClient();
-    if (!session) return NextResponse.json({ error: "Sign in to update your profile." }, { status: 401 });
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Sign in to update your profile." }, { status: 401 });
+    }
 
-    const { data, error } = await session.supabase
-      .from("profiles")
-      .update({ username: input.username, display_name: input.displayName, bio: input.bio || null })
-      .eq("id", session.user.id)
-      .select("id, username, display_name, bio, created_at, updated_at")
-      .maybeSingle();
+    const users = await getUsersCollection();
+    const newUsernameNormalized = input.username.toLowerCase();
 
-    if (error?.code === "23505") return NextResponse.json({ error: "That username is already in use." }, { status: 409 });
-    if (error) return NextResponse.json({ error: "Unable to save your profile. Check your values and database setup." }, { status: 400 });
-    if (!data) return NextResponse.json({ error: "Your profile is not available. Check that the profiles migration is applied." }, { status: 404 });
-    return NextResponse.json({ profile: profileResponse(data) }, { headers: { "Cache-Control": "private, no-store" } });
+    // Check if taken by another user
+    const conflicting = await users.findOne({
+      usernameNormalized: newUsernameNormalized,
+      $nor: [{ id: user.id }, { _id: user.id }],
+    });
+
+    if (conflicting) {
+      return NextResponse.json({ error: "That username is already in use." }, { status: 409 });
+    }
+
+    const now = new Date().toISOString();
+    const updateFields = {
+      username: input.username,
+      usernameNormalized: newUsernameNormalized,
+      displayName: input.displayName,
+      bio: input.bio || "",
+      updatedAt: now,
+    };
+
+    const result = await users.findOneAndUpdate(
+      { $or: [{ id: user.id }, { _id: user.id }] },
+      { $set: updateFields },
+      { returnDocument: "after" }
+    );
+
+    if (!result) {
+      return NextResponse.json({ error: "Your profile is not available." }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      { profile: profileResponse(result) },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch {
     return NextResponse.json({ error: "Profile service is unavailable." }, { status: 503 });
   }
