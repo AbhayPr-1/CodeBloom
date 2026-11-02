@@ -1,213 +1,119 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/auth";
-import { isMongoConfigured } from "@/lib/mongodb/client";
-import {
-  getBookmarksCollection,
-  getCreatorFollowsCollection,
-  getProjectCommentsCollection,
-  getProjectMediaCollection,
-  getProjectsCollection,
-  getProjectUpdatesCollection,
-  getProjectVotesCollection,
-  getUsersCollection,
-} from "@/lib/mongodb/collections";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseConfig } from "@/lib/supabase/config";
 import { mapLiveProjectRows, type LiveFeedSocialRows, type LiveProjectRow } from "@/lib/live-feed";
 
+type Relation<T> = T | T[] | null;
+type MediaRow = { id: string; storage_path: string; alt_text: string; position: number };
+type UpdateRow = {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  profiles: Relation<{ username: string; display_name: string }>;
+};
+type ProjectDetailRow = LiveProjectRow & { project_media: MediaRow[] | null; project_updates: UpdateRow[] | null };
+
+const projectSelection = [
+  "id, owner_id, slug, name, tagline, description, repository_url, demo_url, status, created_at",
+  "profiles!projects_owner_id_fkey(username, display_name)",
+  "project_tags(tag)",
+  "project_media(id, storage_path, alt_text, position)",
+  "project_updates(id, title, body, created_at, profiles!project_updates_author_id_fkey(username, display_name))",
+].join(", ");
+
+function relation<T>(value: Relation<T>): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+const emptySocial: LiveFeedSocialRows = {
+  voteTotals: [], userVotes: [], commentTotals: [], comments: [], bookmarks: [], follows: [],
+};
+
 export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
-  if (!isMongoConfigured()) {
-    return NextResponse.json({ error: "The live project service is not configured." }, { status: 503 });
-  }
-
+  if (!getSupabaseConfig()) return NextResponse.json({ error: "The live project service is not configured." }, { status: 503 });
   const { slug } = await context.params;
-
   try {
-    const user = await getAuthenticatedUser();
-    const projects = await getProjectsCollection();
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    // RLS returns public published projects to visitors and also lets each owner see their own drafts/private projects.
+    const { data: row, error: projectError } = await supabase.from("projects").select(projectSelection).eq("slug", slug).maybeSingle();
+    if (projectError) return NextResponse.json({ error: "Unable to load this project. Apply the reviewed Phase 4 migration." }, { status: 503 });
+    if (!row) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 
-    const projectDoc = await projects.findOne({ slug });
-    if (!projectDoc) {
-      return NextResponse.json({ error: "Project not found." }, { status: 404 });
-    }
-
-    const isOwner = user && (user.id === projectDoc.ownerId || user.id === projectDoc._id);
-    if (projectDoc.status !== "published" && !isOwner) {
-      return NextResponse.json({ error: "Project not found." }, { status: 404 });
-    }
-
-    const users = await getUsersCollection();
-    const ownerDoc = await users.findOne({
-      $or: [{ id: projectDoc.ownerId }, { _id: projectDoc.ownerId }],
-    });
-
-    const projectId = projectDoc.id || projectDoc._id;
-
-    // Social data aggregation
-    const votesCollection = await getProjectVotesCollection();
-    const commentsCollection = await getProjectCommentsCollection();
-    const bookmarksCollection = await getBookmarksCollection();
-    const followsCollection = await getCreatorFollowsCollection();
-    const mediaCollection = await getProjectMediaCollection();
-    const updatesCollection = await getProjectUpdatesCollection();
-
-    const [allVotes, userVoteDoc, commentCount, recentCommentsDocs, isBookmarked, isFollowing] = await Promise.all([
-      votesCollection.find({ projectId }).toArray(),
-      user ? votesCollection.findOne({ userId: user.id, projectId }) : null,
-      commentsCollection.countDocuments({ projectId }),
-      commentsCollection.find({ projectId }).sort({ createdAt: -1 }).limit(3).toArray(),
-      user ? bookmarksCollection.findOne({ userId: user.id, projectId }) : null,
-      user ? followsCollection.findOne({ followerId: user.id, followedId: projectDoc.ownerId }) : null,
+    const projectRow = row as unknown as ProjectDetailRow;
+    const socialResults = await Promise.all([
+      supabase.from("project_vote_totals").select("project_id, score, upvotes, downvotes").eq("project_id", projectRow.id),
+      user ? supabase.from("project_votes").select("project_id, value").eq("user_id", user.id).eq("project_id", projectRow.id) : Promise.resolve({ data: [], error: null }),
+      supabase.from("project_comment_totals").select("project_id, comment_count").eq("project_id", projectRow.id),
+      supabase.from("project_comments").select("id, project_id, body, created_at, author_id, profiles!project_comments_author_id_fkey(username, display_name)").eq("project_id", projectRow.id).order("created_at", { ascending: false }).limit(3),
+      user ? supabase.from("bookmarks").select("project_id").eq("user_id", user.id).eq("project_id", projectRow.id) : Promise.resolve({ data: [], error: null }),
+      user ? supabase.from("creator_follows").select("followed_id").eq("follower_id", user.id) : Promise.resolve({ data: [], error: null }),
     ]);
-
-    let upvotes = 0;
-    let downvotes = 0;
-    for (const v of allVotes) {
-      if (v.value === 1) upvotes++;
-      else if (v.value === -1) downvotes++;
-    }
-    const score = upvotes - downvotes;
-
-    // Populate comment authors
-    const authorIds = [...new Set(recentCommentsDocs.map((c) => c.authorId))];
-    const authorDocs = authorIds.length
-      ? await users.find({ $or: [{ id: { $in: authorIds } }, { _id: { $in: authorIds } }] }).toArray()
-      : [];
-    const authorsById = new Map(authorDocs.map((a) => [a.id || a._id, a]));
-
-    const comments = recentCommentsDocs.map((c) => {
-      const author = authorsById.get(c.authorId);
-      return {
-        id: c.id || c._id,
-        project_id: projectId,
-        body: c.body,
-        created_at: c.createdAt,
-        author_id: c.authorId,
-        profiles: {
-          username: author?.username ?? "member",
-          display_name: author?.displayName ?? "CodeBloom member",
-        },
-      };
-    });
-
-    const social: LiveFeedSocialRows = {
-      voteTotals: [{ project_id: projectId, score, upvotes, downvotes }],
-      userVotes: userVoteDoc ? [{ project_id: projectId, value: userVoteDoc.value }] : [],
-      commentTotals: [{ project_id: projectId, comment_count: commentCount }],
-      comments,
-      bookmarks: isBookmarked ? [{ project_id: projectId }] : [],
-      follows: isFollowing ? [{ followed_id: projectDoc.ownerId }] : [],
-    };
-
-    const mediaDocs = await mediaCollection.find({ projectId }).sort({ position: 1 }).toArray();
-
-    const projectRow: LiveProjectRow = {
-      id: projectId,
-      owner_id: projectDoc.ownerId,
-      slug: projectDoc.slug,
-      name: projectDoc.name,
-      tagline: projectDoc.tagline,
-      description: projectDoc.description,
-      repository_url: projectDoc.repositoryUrl,
-      demo_url: projectDoc.demoUrl ?? null,
-      status: projectDoc.status,
-      created_at: projectDoc.createdAt,
-      profiles: {
-        username: ownerDoc?.username ?? "member",
-        display_name: ownerDoc?.displayName ?? "CodeBloom member",
-      },
-      project_tags: (projectDoc.tags || []).map((t) => ({ tag: t })),
-      project_media: mediaDocs.map((m) => ({
-        id: m.id || m._id,
-        storage_path: m.storagePath,
-        alt_text: m.altText,
-        position: m.position,
-      })),
-    };
-
+    const social: LiveFeedSocialRows = socialResults.some((result) => result.error)
+      ? emptySocial
+      : {
+          voteTotals: socialResults[0].data ?? [],
+          userVotes: socialResults[1].data ?? [],
+          commentTotals: socialResults[2].data ?? [],
+          comments: socialResults[3].data ?? [],
+          bookmarks: socialResults[4].data ?? [],
+          follows: socialResults[5].data ?? [],
+        } as LiveFeedSocialRows;
     const [liveProject] = mapLiveProjectRows([projectRow], social);
 
-    const media = mediaDocs.map((item) => ({
-      id: item.id || item._id,
-      url: `/api/media/${encodeURI(item.storagePath)}`,
-      altText: item.altText,
-      position: item.position,
-    }));
+    const mediaRows = [...(projectRow.project_media ?? [])].sort((a, b) => a.position - b.position);
+    let media: NonNullable<typeof liveProject.media> = [];
+    if (mediaRows.length) {
+      const { data: signedRows } = await supabase.storage.from("project-media").createSignedUrls(mediaRows.map((item) => item.storage_path), 3600);
+      const signedByPath = new Map((signedRows ?? []).flatMap((item) => item.path && (item.signedUrl ?? item.signedURL) ? [[item.path, item.signedUrl ?? item.signedURL!] as const] : []));
+      media = mediaRows.flatMap((item) => {
+        const url = signedByPath.get(item.storage_path);
+        return url ? [{ id: item.id, url, altText: item.alt_text, position: item.position }] : [];
+      });
+    }
 
-    const updateDocs = await updatesCollection.find({ projectId }).sort({ createdAt: -1 }).toArray();
-    const updateAuthorIds = [...new Set(updateDocs.map((u) => u.authorId))];
-    const updateAuthors = updateAuthorIds.length
-      ? await users.find({ $or: [{ id: { $in: updateAuthorIds } }, { _id: { $in: updateAuthorIds } }] }).toArray()
-      : [];
-    const updateAuthorsById = new Map(updateAuthors.map((u) => [u.id || u._id, u]));
-
-    const updates = updateDocs.map((item) => {
-      const author = updateAuthorsById.get(item.authorId);
-      return {
-        id: item.id || item._id,
-        title: item.title,
-        body: item.body,
-        createdAt: item.createdAt,
-        authorName: author?.displayName ?? "Project owner",
-        authorUsername: author?.username ?? "member",
-      };
-    });
-
-    return NextResponse.json(
-      { project: { ...liveProject, media, updates } },
-      { headers: { "Cache-Control": "private, no-store" } }
-    );
+    const updates = [...(projectRow.project_updates ?? [])]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .map((item) => {
+        const author = relation(item.profiles);
+        return { id: item.id, title: item.title, body: item.body, createdAt: item.created_at, authorName: author?.display_name ?? "Project owner", authorUsername: author?.username ?? "member" };
+      });
+    return NextResponse.json({ project: { ...liveProject, media, updates } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "The live project service is unavailable." }, { status: 503 });
   }
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ slug: string }> }) {
-  if (!isMongoConfigured()) {
-    return NextResponse.json({ error: "Project cleanup is not configured." }, { status: 503 });
-  }
-
+  if (!getSupabaseConfig()) return NextResponse.json({ error: "Project cleanup is not configured." }, { status: 503 });
   try {
     const { slug } = await context.params;
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in to remove this draft." }, { status: 401 });
-    }
-
-    const projects = await getProjectsCollection();
-    const project = await projects.findOne({ slug, ownerId: user.id });
-
-    if (!project) {
-      return NextResponse.json({ error: "Draft not found." }, { status: 404 });
-    }
-
-    if (project.status !== "draft") {
-      return NextResponse.json(
-        { error: "Only an unpublished draft can be removed by this cleanup endpoint." },
-        { status: 409 }
-      );
-    }
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: "Sign in to remove this draft." }, { status: 401 });
+    const { data: project, error: lookupError } = await supabase.from("projects")
+      .select("id, status, project_media(storage_path)")
+      .eq("slug", slug).eq("owner_id", user.id).maybeSingle();
+    if (lookupError) return NextResponse.json({ error: "Unable to verify draft ownership." }, { status: 503 });
+    if (!project) return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+    if (project.status !== "draft") return NextResponse.json({ error: "Only an unpublished draft can be removed by this cleanup endpoint." }, { status: 409 });
 
     let requestedPaths: unknown = [];
-    try {
-      requestedPaths = ((await request.json()) as { storagePaths?: unknown }).storagePaths ?? [];
-    } catch {
-      // Cleanup may be called with an empty body
-    }
-
-    const projectId = project.id || project._id;
-    if (
-      Array.isArray(requestedPaths) &&
-      requestedPaths.some((path) => typeof path !== "string" || !path.startsWith(`${projectId}/${user.id}/`))
-    ) {
+    try { requestedPaths = (await request.json() as { storagePaths?: unknown }).storagePaths ?? []; } catch { /* Cleanup may be called with an empty body. */ }
+    if (!Array.isArray(requestedPaths) || requestedPaths.some((path) => typeof path !== "string" || !path.startsWith(`${project.id}/${user.id}/`))) {
       return NextResponse.json({ error: "Cleanup paths must belong to this draft and account." }, { status: 400 });
     }
-
-    // Delete media records
-    const mediaCollection = await getProjectMediaCollection();
-    await mediaCollection.deleteMany({ projectId });
-
-    // Delete draft project
-    await projects.deleteOne({ id: projectId, ownerId: user.id, status: "draft" });
-
+    const paths = [...new Set([...(project.project_media ?? []).map((media) => media.storage_path), ...requestedPaths as string[]])];
+    if (paths.length > 5 || paths.some((path) => !new RegExp(`^${project.id}/${user.id}/[0-9a-f-]{36}\\.(png|jpg|webp)$`, "i").test(path))) {
+      return NextResponse.json({ error: "The draft contains an unexpected media path." }, { status: 400 });
+    }
+    if (paths.length) {
+      const { error: storageError } = await supabase.storage.from("project-media").remove(paths);
+      if (storageError) return NextResponse.json({ error: "The draft's uploaded images could not be cleaned up." }, { status: 503 });
+    }
+    const { error: deleteError } = await supabase.from("projects").delete().eq("id", project.id).eq("owner_id", user.id).eq("status", "draft");
+    if (deleteError) return NextResponse.json({ error: "The private draft could not be removed." }, { status: 503 });
     return new Response(null, { status: 204, headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "The project cleanup service is unavailable." }, { status: 503 });

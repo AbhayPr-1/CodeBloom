@@ -27,7 +27,7 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState(authError ? "That session could not be verified or has expired. Sign in again to continue." : "");
+  const [error, setError] = useState(authError ? "That secure email link could not be verified or has expired. Request a new link and try again." : "");
   const [message, setMessage] = useState("");
   const copy = descriptions[mode];
   const destination = safeAuthDestination(next);
@@ -37,7 +37,7 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
     setError("");
     setMessage("");
     if (!configured) {
-      setError("Authentication is not configured yet. Add your MongoDB Atlas connection string to .env.local.");
+      setError("Authentication is not configured yet. Add your Supabase project URL and publishable key, then enable Email auth in Supabase.");
       return;
     }
 
@@ -60,9 +60,12 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
         router.replace(authSuccessDestination(destination, "login"));
         router.refresh();
       } else if (mode === "signup") {
-        const { data, error: authError } = await client.auth.signUp({ email, password });
+        const callback = new URL("/auth/callback", window.location.origin);
+        callback.searchParams.set("next", destination);
+        callback.searchParams.set("flow", "signup");
+        const { data, error: authError } = await client.auth.signUp({ email, password, options: { emailRedirectTo: callback.toString() } });
         if (authError) throw authError;
-        if (data?.session) {
+        if (data.session) {
           await refresh();
           router.replace(authSuccessDestination(destination, "signup"));
           router.refresh();
@@ -70,7 +73,9 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
           setMessage("Check your email to confirm your account. Your secure link will bring you back to CodeBloom, where you can take your first steps.");
         }
       } else if (mode === "forgot") {
-        const { error: authError } = await client.auth.resetPasswordForEmail(email);
+        const callback = new URL("/auth/callback", window.location.origin);
+        callback.searchParams.set("next", "/reset-password");
+        const { error: authError } = await client.auth.resetPasswordForEmail(email, { redirectTo: callback.toString() });
         if (authError) throw authError;
         setMessage("If an account exists for that email, a password recovery link is on its way.");
       } else {
@@ -79,8 +84,8 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
         setMessage("Your password has been updated. You can continue to CodeBloom.");
         await refresh();
       }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "We could not complete that request. Check your details and try again.");
+    } catch {
+      setError("We could not complete that request. Check your details and Supabase Auth configuration, then try again.");
     } finally {
       setBusy(false);
     }
@@ -113,7 +118,7 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
         <p className="landing-kicker">{copy.eyebrow}</p>
         <h1 id="auth-title">{copy.title}</h1>
         <p className="auth-panel-description">{copy.description}</p>
-        {!configured && <div className="auth-config-warning" role="status"><LockKeyhole size={17} /><span>MongoDB Atlas setup is required to use this form. Public project browsing remains available.</span></div>}
+        {!configured && <div className="auth-config-warning" role="status"><LockKeyhole size={17} /><span>Supabase Auth setup is required to use this form. Public project browsing remains available.</span></div>}
         <form className="auth-form" onSubmit={submit} aria-busy={busy}>
           {needsEmail && <label>Email address<span className="auth-input-wrap"><Mail size={16} /><input required type="email" name="email" autoComplete="email" placeholder="you@example.com" /></span></label>}
           {needsPassword && <label>{mode === "reset" ? "New password" : "Password"}<span className="auth-input-wrap"><LockKeyhole size={16} /><input required type={showPassword ? "text" : "password"} name="password" minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder="At least 8 characters" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></span></label>}
@@ -124,7 +129,7 @@ export function AuthPage({ mode, next = "/dashboard", authError = false }: { mod
           <button className="button button-primary button-wide auth-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : mode === "signup" ? <>Create account <ArrowRight size={15} /></> : mode === "forgot" ? "Send recovery link" : "Update password"}</button>
         </form>
         <div className="auth-switch">{mode === "login" ? <>New to CodeBloom? <Link href={`/signup?next=${encodeURIComponent(destination)}`}>Create an account</Link></> : mode === "signup" ? <>Already growing with us? <Link href={`/login?next=${encodeURIComponent(destination)}`}>Sign in</Link></> : mode === "forgot" ? <>Remembered it? <Link href={`/login?next=${encodeURIComponent(destination)}`}>Back to sign in</Link></> : <>Password updated? <Link href="/login">Sign in</Link></>}</div>
-        <p className="auth-privacy-note">By continuing, you agree to keep the garden welcoming. Your account is secured with MongoDB Atlas.</p>
+        <p className="auth-privacy-note">By continuing, you agree to keep the garden welcoming. Your account is managed through Supabase Auth.</p>
       </section>
     </div>
     <footer className="auth-public-footer">CodeBloom · Great projects don&apos;t grow alone.</footer>
