@@ -1,84 +1,223 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseConfig } from "@/lib/supabase/config";
-import { mapLiveProjectRows, sortLiveFeed, type LiveFeedMode, type LiveFeedSocialRows, type LiveProjectMedia, type LiveProjectRow } from "@/lib/live-feed";
+import { getAuthenticatedUser } from "@/lib/auth";
+import { isMongoConfigured } from "@/lib/mongodb/client";
+import {
+  getBookmarksCollection,
+  getCreatorFollowsCollection,
+  getProjectCommentsCollection,
+  getProjectMediaCollection,
+  getProjectsCollection,
+  getProjectVotesCollection,
+  getUsersCollection,
+} from "@/lib/mongodb/collections";
+import {
+  mapLiveProjectRows,
+  sortLiveFeed,
+  type LiveFeedMode,
+  type LiveFeedSocialRows,
+  type LiveProjectMedia,
+  type LiveProjectRow,
+} from "@/lib/live-feed";
 
 const feedModes: LiveFeedMode[] = ["For you", "Hot", "New", "Top", "Rising", "Following", "Bookmarks"];
-const projectSelection = "id, owner_id, slug, name, tagline, description, repository_url, demo_url, status, created_at, profiles!projects_owner_id_fkey(username, display_name), project_tags(tag), project_media(id, storage_path, alt_text, position)";
 
 export async function GET(request: Request) {
-  if (!getSupabaseConfig()) return NextResponse.json({ error: "The live project feed is not configured." }, { status: 503 });
+  if (!isMongoConfigured()) {
+    return NextResponse.json({ error: "The live project feed is not configured." }, { status: 503 });
+  }
+
   const url = new URL(request.url);
   const requestedMode = url.searchParams.get("mode") ?? "For you";
-  if (!feedModes.includes(requestedMode as LiveFeedMode)) return NextResponse.json({ error: "Choose a supported feed mode." }, { status: 400 });
+  if (!feedModes.includes(requestedMode as LiveFeedMode)) {
+    return NextResponse.json({ error: "Choose a supported feed mode." }, { status: 400 });
+  }
   const mode = requestedMode as LiveFeedMode;
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
 
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: "Sign in to load your dashboard feed." }, { status: 401 });
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Sign in to load your dashboard feed." }, { status: 401 });
+    }
+
+    const projectsCollection = await getProjectsCollection();
+    const followsCollection = await getCreatorFollowsCollection();
+    const bookmarksCollection = await getBookmarksCollection();
 
     let followedIds: string[] = [];
     if (mode === "Following") {
-      const { data, error } = await supabase.from("creator_follows").select("followed_id").eq("follower_id", user.id);
-      if (error) return NextResponse.json({ error: "Unable to load followed creators. Apply the live social migration." }, { status: 503 });
-      followedIds = (data ?? []).map((row) => row.followed_id);
-      if (followedIds.length === 0) return NextResponse.json({ projects: [], mode, source: "live" }, { headers: { "Cache-Control": "private, no-store" } });
-    }
-    let bookmarkedIds: string[] = [];
-    if (mode === "Bookmarks") {
-      const { data, error } = await supabase.from("bookmarks").select("project_id").eq("user_id", user.id);
-      if (error) return NextResponse.json({ error: "Unable to load saved projects." }, { status: 503 });
-      bookmarkedIds = (data ?? []).map((row) => row.project_id);
-      if (bookmarkedIds.length === 0) return NextResponse.json({ projects: [], mode, source: "live" }, { headers: { "Cache-Control": "private, no-store" } });
-    }
-
-    let projectQuery = supabase.from("projects").select(projectSelection).eq("visibility", "public").eq("status", "published").order("created_at", { ascending: false }).limit(100);
-    if (mode === "Following") projectQuery = projectQuery.in("owner_id", followedIds);
-    if (mode === "Bookmarks") projectQuery = projectQuery.in("id", bookmarkedIds);
-    const { data: projectRows, error: projectError } = await projectQuery;
-    if (projectError) return NextResponse.json({ error: "Unable to load live projects." }, { status: 503 });
-    const rows = (projectRows ?? []) as unknown as LiveProjectRow[];
-    if (!rows.length) return NextResponse.json({ projects: [], mode, source: "live" }, { headers: { "Cache-Control": "private, no-store" } });
-    const ids = rows.map((row) => row.id);
-    const [voteTotalsResult, userVotesResult, commentTotalsResult, commentsResult, bookmarksResult, followsResult] = await Promise.all([
-      supabase.from("project_vote_totals").select("project_id, score, upvotes, downvotes").in("project_id", ids),
-      supabase.from("project_votes").select("project_id, value").eq("user_id", user.id).in("project_id", ids),
-      supabase.from("project_comment_totals").select("project_id, comment_count").in("project_id", ids),
-      supabase.from("project_comments").select("id, project_id, body, created_at, author_id, profiles!project_comments_author_id_fkey(username, display_name)").in("project_id", ids).order("created_at", { ascending: false }).limit(300),
-      supabase.from("bookmarks").select("project_id").eq("user_id", user.id).in("project_id", ids),
-      supabase.from("creator_follows").select("followed_id").eq("follower_id", user.id),
-    ]);
-    const aggregateError = voteTotalsResult.error ?? userVotesResult.error ?? commentTotalsResult.error ?? commentsResult.error ?? bookmarksResult.error ?? followsResult.error;
-    if (aggregateError) return NextResponse.json({ error: "Live social data is unavailable. Apply the live social migration before using this feed." }, { status: 503 });
-    const social = {
-      voteTotals: voteTotalsResult.data ?? [],
-      userVotes: userVotesResult.data ?? [],
-      commentTotals: commentTotalsResult.data ?? [],
-      comments: commentsResult.data ?? [],
-      bookmarks: bookmarksResult.data ?? [],
-      follows: followsResult.data ?? [],
-    } as LiveFeedSocialRows;
-    const mediaRows = rows.flatMap((row) => (row.project_media ?? []).map((media) => ({ ...media, project_id: row.id })));
-    const signedByPath = new Map<string, string>();
-    if (mediaRows.length) {
-      const { data: signedRows, error: signingError } = await supabase.storage.from("project-media").createSignedUrls(mediaRows.map((item) => item.storage_path), 3600);
-      if (!signingError) for (const item of signedRows ?? []) {
-        const url = item.signedUrl ?? item.signedURL;
-        if (item.path && url) signedByPath.set(item.path, url);
+      const followDocs = await followsCollection.find({ followerId: user.id }).toArray();
+      followedIds = followDocs.map((row) => row.followedId);
+      if (followedIds.length === 0) {
+        return NextResponse.json(
+          { projects: [], mode, source: "live" },
+          { headers: { "Cache-Control": "private, no-store" } }
+        );
       }
     }
-    const mediaByProject = new Map<string, LiveProjectMedia[]>();
-    for (const item of mediaRows) {
-      const url = signedByPath.get(item.storage_path);
-      if (!url) continue;
-      const projectMedia = mediaByProject.get(item.project_id) ?? [];
-      projectMedia.push({ id: item.id, url, altText: item.alt_text, position: item.position });
-      mediaByProject.set(item.project_id, projectMedia);
+
+    let bookmarkedIds: string[] = [];
+    if (mode === "Bookmarks") {
+      const bookmarkDocs = await bookmarksCollection.find({ userId: user.id }).toArray();
+      bookmarkedIds = bookmarkDocs.map((row) => row.projectId);
+      if (bookmarkedIds.length === 0) {
+        return NextResponse.json(
+          { projects: [], mode, source: "live" },
+          { headers: { "Cache-Control": "private, no-store" } }
+        );
+      }
     }
-    const projects = sortLiveFeed(mapLiveProjectRows(rows, social).map((project) => ({ ...project, media: mediaByProject.get(project.id) ?? [] })), mode, query);
-    return NextResponse.json({ projects, mode, source: "live" }, { headers: { "Cache-Control": "private, no-store" } });
+
+    const filter: Record<string, unknown> = {
+      visibility: "public",
+      status: "published",
+    };
+    if (mode === "Following") {
+      filter.ownerId = { $in: followedIds };
+    }
+    if (mode === "Bookmarks") {
+      filter.$or = [{ id: { $in: bookmarkedIds } }, { _id: { $in: bookmarkedIds } }];
+    }
+
+    const projectDocs = await projectsCollection.find(filter).sort({ createdAt: -1 }).limit(100).toArray();
+
+    if (!projectDocs.length) {
+      return NextResponse.json(
+        { projects: [], mode, source: "live" },
+        { headers: { "Cache-Control": "private, no-store" } }
+      );
+    }
+
+    const ids = projectDocs.map((p) => p.id || p._id);
+    const ownerIds = [...new Set(projectDocs.map((p) => p.ownerId))];
+
+    const usersCollection = await getUsersCollection();
+    const votesCollection = await getProjectVotesCollection();
+    const commentsCollection = await getProjectCommentsCollection();
+    const mediaCollection = await getProjectMediaCollection();
+
+    const [owners, allVotes, userVotes, commentsDocs, userBookmarks, userFollows, mediaDocs] = await Promise.all([
+      usersCollection.find({ $or: [{ id: { $in: ownerIds } }, { _id: { $in: ownerIds } }] }).toArray(),
+      votesCollection.find({ projectId: { $in: ids } }).toArray(),
+      votesCollection.find({ userId: user.id, projectId: { $in: ids } }).toArray(),
+      commentsCollection.find({ projectId: { $in: ids } }).sort({ createdAt: -1 }).limit(300).toArray(),
+      bookmarksCollection.find({ userId: user.id, projectId: { $in: ids } }).toArray(),
+      followsCollection.find({ followerId: user.id }).toArray(),
+      mediaCollection.find({ projectId: { $in: ids } }).sort({ position: 1 }).toArray(),
+    ]);
+
+    const ownersById = new Map(owners.map((o) => [o.id || o._id, o]));
+
+    // Aggregate votes per project
+    const voteTotalsMap = new Map<string, { score: number; upvotes: number; downvotes: number }>();
+    for (const v of allVotes) {
+      const current = voteTotalsMap.get(v.projectId) ?? { score: 0, upvotes: 0, downvotes: 0 };
+      if (v.value === 1) {
+        current.upvotes++;
+        current.score++;
+      } else if (v.value === -1) {
+        current.downvotes++;
+        current.score--;
+      }
+      voteTotalsMap.set(v.projectId, current);
+    }
+    const voteTotals = ids.map((id) => {
+      const t = voteTotalsMap.get(id) ?? { score: 0, upvotes: 0, downvotes: 0 };
+      return { project_id: id, ...t };
+    });
+
+    // Aggregate comments count
+    const commentCountMap = new Map<string, number>();
+    for (const c of commentsDocs) {
+      commentCountMap.set(c.projectId, (commentCountMap.get(c.projectId) ?? 0) + 1);
+    }
+    const commentTotals = ids.map((id) => ({
+      project_id: id,
+      comment_count: commentCountMap.get(id) ?? 0,
+    }));
+
+    // Populate comment author names
+    const commentAuthorIds = [...new Set(commentsDocs.map((c) => c.authorId))];
+    const commentAuthors = commentAuthorIds.length
+      ? await usersCollection.find({ $or: [{ id: { $in: commentAuthorIds } }, { _id: { $in: commentAuthorIds } }] }).toArray()
+      : [];
+    const commentAuthorsById = new Map(commentAuthors.map((a) => [a.id || a._id, a]));
+
+    const comments = commentsDocs.map((c) => {
+      const author = commentAuthorsById.get(c.authorId);
+      return {
+        id: c.id || c._id,
+        project_id: c.projectId,
+        body: c.body,
+        created_at: c.createdAt,
+        author_id: c.authorId,
+        profiles: {
+          username: author?.username ?? "member",
+          display_name: author?.displayName ?? "CodeBloom member",
+        },
+      };
+    });
+
+    const social: LiveFeedSocialRows = {
+      voteTotals,
+      userVotes: userVotes.map((v) => ({ project_id: v.projectId, value: v.value })),
+      commentTotals,
+      comments,
+      bookmarks: userBookmarks.map((b) => ({ project_id: b.projectId })),
+      follows: userFollows.map((f) => ({ followed_id: f.followedId })),
+    };
+
+    const mediaByProject = new Map<string, LiveProjectMedia[]>();
+    for (const m of mediaDocs) {
+      const list = mediaByProject.get(m.projectId) ?? [];
+      list.push({
+        id: m.id || m._id,
+        url: `/api/media/${encodeURI(m.storagePath)}`,
+        altText: m.altText,
+        position: m.position,
+      });
+      mediaByProject.set(m.projectId, list);
+    }
+
+    const rows: LiveProjectRow[] = projectDocs.map((doc) => {
+      const pid = doc.id || doc._id;
+      const owner = ownersById.get(doc.ownerId);
+      return {
+        id: pid,
+        owner_id: doc.ownerId,
+        slug: doc.slug,
+        name: doc.name,
+        tagline: doc.tagline,
+        description: doc.description,
+        repository_url: doc.repositoryUrl,
+        demo_url: doc.demoUrl ?? null,
+        status: doc.status,
+        created_at: doc.createdAt,
+        profiles: {
+          username: owner?.username ?? "member",
+          display_name: owner?.displayName ?? "CodeBloom member",
+        },
+        project_tags: (doc.tags || []).map((t) => ({ tag: t })),
+        project_media: (mediaByProject.get(pid) ?? []).map((m) => ({
+          id: m.id,
+          storage_path: m.url,
+          alt_text: m.altText,
+          position: m.position,
+        })),
+      };
+    });
+
+    const mapped = mapLiveProjectRows(rows, social).map((project) => ({
+      ...project,
+      media: mediaByProject.get(project.id) ?? [],
+    }));
+
+    const sortedProjects = sortLiveFeed(mapped, mode, query);
+
+    return NextResponse.json(
+      { projects: sortedProjects, mode, source: "live" },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch {
     return NextResponse.json({ error: "The live feed service is unavailable." }, { status: 503 });
   }

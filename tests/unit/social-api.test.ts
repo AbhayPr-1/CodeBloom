@@ -1,31 +1,65 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSupabaseServerClient } = vi.hoisted(() => ({ createSupabaseServerClient: vi.fn() }));
-vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient }));
+const {
+  getAuthenticatedUser,
+  isMongoConfigured,
+  getBookmarksCollection,
+  getCreatorFollowsCollection,
+  getProjectCommentsCollection,
+  getProjectsCollection,
+  getProjectVotesCollection,
+  getUsersCollection,
+} = vi.hoisted(() => ({
+  getAuthenticatedUser: vi.fn(),
+  isMongoConfigured: vi.fn(),
+  getBookmarksCollection: vi.fn(),
+  getCreatorFollowsCollection: vi.fn(),
+  getProjectCommentsCollection: vi.fn(),
+  getProjectsCollection: vi.fn(),
+  getProjectVotesCollection: vi.fn(),
+  getUsersCollection: vi.fn(),
+}));
+
+vi.mock("@/lib/auth", () => ({ getAuthenticatedUser }));
+vi.mock("@/lib/mongodb/client", () => ({ isMongoConfigured }));
+vi.mock("@/lib/mongodb/collections", () => ({
+  getBookmarksCollection,
+  getCreatorFollowsCollection,
+  getProjectCommentsCollection,
+  getProjectsCollection,
+  getProjectVotesCollection,
+  getUsersCollection,
+}));
+
 import { GET, POST } from "@/app/api/social/route";
 
-const user = { id: "22222222-2222-4222-8222-222222222222", email: "member@example.test" };
+const user = {
+  id: "22222222-2222-4222-8222-222222222222",
+  email: "member@example.test",
+  username: "member_name",
+  displayName: "Member",
+  user_metadata: { user_name: "member_name", full_name: "Member" },
+};
 const projectId = "11111111-1111-4111-8111-111111111111";
 const url = "http://localhost/api/social";
 
 function request(body: unknown, origin = "http://localhost") {
-  return new Request(url, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify(body) });
-}
-function query(result: { data?: unknown; error?: { code?: string } | null } = { data: null, error: null }) {
-  const chain: Record<string, unknown> = {};
-  for (const method of ["select", "insert", "upsert", "update", "delete", "eq", "in", "order", "limit", "maybeSingle", "single"]) chain[method] = vi.fn(() => chain);
-  chain.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
-  return chain;
-}
-function authenticatedClient(from: ReturnType<typeof vi.fn>) {
-  createSupabaseServerClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) }, from });
+  return new Request(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin },
+    body: JSON.stringify(body),
+  });
 }
 
 describe("POST /api/social", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMongoConfigured.mockReturnValue(true);
+    getAuthenticatedUser.mockResolvedValue(user);
+  });
 
   it("rejects unauthenticated actions", async () => {
-    createSupabaseServerClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }) } });
+    getAuthenticatedUser.mockResolvedValue(null);
     const response = await POST(request({ action: "vote", projectId, value: 1 }));
     expect(response.status).toBe(401);
   });
@@ -35,86 +69,137 @@ describe("POST /api/social", () => {
     expect(crossOrigin.status).toBe(403);
     const invalid = await POST(request({ action: "vote", projectId: "not-a-uuid", value: 1 }));
     expect(invalid.status).toBe(400);
-    expect(createSupabaseServerClient).not.toHaveBeenCalled();
+    expect(getProjectVotesCollection).not.toHaveBeenCalled();
   });
 
   it("upserts a vote for the authenticated account only", async () => {
-    const voteQuery = query();
-    const from = vi.fn(() => voteQuery);
-    authenticatedClient(from);
+    const mockVotes = {
+      updateOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+    };
+    getProjectVotesCollection.mockResolvedValue(mockVotes);
+
     const response = await POST(request({ action: "vote", projectId, value: -1 }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ action: "vote", value: -1 });
-    expect(from).toHaveBeenCalledWith("project_votes");
-    expect(voteQuery.upsert).toHaveBeenCalledWith({ user_id: user.id, project_id: projectId, value: -1 }, { onConflict: "user_id,project_id" });
+    expect(mockVotes.updateOne).toHaveBeenCalledWith(
+      { userId: user.id, projectId },
+      expect.objectContaining({
+        $set: expect.objectContaining({ userId: user.id, projectId, value: -1 }),
+      }),
+      { upsert: true }
+    );
   });
 
   it("removes a prior vote by both authenticated user and project key", async () => {
-    const voteQuery = query();
-    const from = vi.fn(() => voteQuery);
-    authenticatedClient(from);
+    const mockVotes = {
+      deleteOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+    };
+    getProjectVotesCollection.mockResolvedValue(mockVotes);
+
     const response = await POST(request({ action: "vote", projectId, value: null }));
     expect(response.status).toBe(200);
-    expect(voteQuery.delete).toHaveBeenCalledOnce();
-    expect(voteQuery.eq).toHaveBeenNthCalledWith(1, "user_id", user.id);
-    expect(voteQuery.eq).toHaveBeenNthCalledWith(2, "project_id", projectId);
+    expect(mockVotes.deleteOne).toHaveBeenCalledWith({ userId: user.id, projectId });
   });
 
   it("saves and removes bookmarks with the signed-in account id", async () => {
-    const bookmarkQuery = query();
-    const from = vi.fn(() => bookmarkQuery);
-    authenticatedClient(from);
+    const mockBookmarks = {
+      updateOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+      deleteOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+    };
+    getBookmarksCollection.mockResolvedValue(mockBookmarks);
+
     const added = await POST(request({ action: "bookmark", projectId, saved: true }));
     expect(added.status).toBe(200);
-    expect(bookmarkQuery.upsert).toHaveBeenCalledWith({ user_id: user.id, project_id: projectId }, { onConflict: "user_id,project_id", ignoreDuplicates: true });
+    expect(mockBookmarks.updateOne).toHaveBeenCalledWith(
+      { userId: user.id, projectId },
+      expect.objectContaining({
+        $set: expect.objectContaining({ userId: user.id, projectId }),
+      }),
+      { upsert: true }
+    );
+
     const removed = await POST(request({ action: "bookmark", projectId, saved: false }));
     expect(removed.status).toBe(200);
-    expect(bookmarkQuery.delete).toHaveBeenCalledOnce();
+    expect(mockBookmarks.deleteOne).toHaveBeenCalledWith({ userId: user.id, projectId });
   });
 
   it("creates a follow using the resolved profile id and ignore-duplicates semantics", async () => {
-    const creatorQuery = query({ data: { id: "33333333-3333-4333-8333-333333333333" }, error: null });
-    const followsQuery = query();
-    const from = vi.fn((table: string) => table === "profiles" ? creatorQuery : followsQuery);
-    authenticatedClient(from);
+    const creatorId = "33333333-3333-4333-8333-333333333333";
+    const mockUsers = {
+      findOne: vi.fn().mockResolvedValue({ id: creatorId, username: "creator_name" }),
+    };
+    const mockFollows = {
+      updateOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+    };
+    getUsersCollection.mockResolvedValue(mockUsers);
+    getCreatorFollowsCollection.mockResolvedValue(mockFollows);
+
     const response = await POST(request({ action: "follow", creatorUsername: "creator_name", following: true }));
     expect(response.status).toBe(200);
-    expect(followsQuery.upsert).toHaveBeenCalledWith({ follower_id: user.id, followed_id: "33333333-3333-4333-8333-333333333333" }, { onConflict: "follower_id,followed_id", ignoreDuplicates: true });
+    expect(mockFollows.updateOne).toHaveBeenCalledWith(
+      { followerId: user.id, followedId: creatorId },
+      expect.objectContaining({
+        $set: expect.objectContaining({ followerId: user.id, followedId: creatorId }),
+      }),
+      { upsert: true }
+    );
   });
 
   it("writes the comment body and author from the authenticated session", async () => {
-    const commentQuery = query({ data: { id: "comment-1", body: "Useful note", created_at: "2026-10-28T10:00:00.000Z" }, error: null });
-    const from = vi.fn(() => commentQuery);
-    authenticatedClient(from);
+    const mockProjects = {
+      findOne: vi.fn().mockResolvedValue({ id: projectId, visibility: "public", status: "published" }),
+    };
+    const mockComments = {
+      insertOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+    };
+    getProjectsCollection.mockResolvedValue(mockProjects);
+    getProjectCommentsCollection.mockResolvedValue(mockComments);
+
     const response = await POST(request({ action: "comment", projectId, body: "  Useful note  " }));
     expect(response.status).toBe(201);
-    expect(commentQuery.insert).toHaveBeenCalledWith({ project_id: projectId, author_id: user.id, body: "Useful note" });
+    expect(mockComments.insertOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId,
+        authorId: user.id,
+        body: "Useful note",
+      })
+    );
   });
 
   it("refuses to follow the current account", async () => {
-    const profileQuery = query({ data: { id: user.id }, error: null });
-    const from = vi.fn(() => profileQuery);
-    authenticatedClient(from);
+    const mockUsers = {
+      findOne: vi.fn().mockResolvedValue({ id: user.id, username: "member_name" }),
+    };
+    getUsersCollection.mockResolvedValue(mockUsers);
+
     const response = await POST(request({ action: "follow", creatorUsername: "member_name", following: true }));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "You cannot follow your own account." });
-    expect(from).toHaveBeenCalledTimes(1);
-    expect(from).toHaveBeenCalledWith("profiles");
   });
 });
 
 describe("GET /api/social follow status", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMongoConfigured.mockReturnValue(true);
+    getAuthenticatedUser.mockResolvedValue(user);
+  });
 
   it("returns only whether the authenticated user follows the resolved creator", async () => {
-    const creatorQuery = query({ data: { id: "33333333-3333-4333-8333-333333333333" }, error: null });
-    const followsQuery = query({ data: { follower_id: user.id }, error: null });
-    const from = vi.fn((table: string) => table === "profiles" ? creatorQuery : followsQuery);
-    authenticatedClient(from);
+    const creatorId = "33333333-3333-4333-8333-333333333333";
+    const mockUsers = {
+      findOne: vi.fn().mockResolvedValue({ id: creatorId, username: "creator_name" }),
+    };
+    const mockFollows = {
+      findOne: vi.fn().mockResolvedValue({ followerId: user.id, followedId: creatorId }),
+    };
+    getUsersCollection.mockResolvedValue(mockUsers);
+    getCreatorFollowsCollection.mockResolvedValue(mockFollows);
+
     const response = await GET(new Request(`${url}?creator=creator_name`));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ following: true });
-    expect(from).toHaveBeenNthCalledWith(1, "profiles");
-    expect(from).toHaveBeenNthCalledWith(2, "creator_follows");
+    expect(mockUsers.findOne).toHaveBeenCalledWith({ usernameNormalized: "creator_name" });
+    expect(mockFollows.findOne).toHaveBeenCalledWith({ followerId: user.id, followedId: creatorId });
   });
 });

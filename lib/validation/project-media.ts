@@ -8,6 +8,8 @@ export const projectMediaInputSchema = z.object({
     storagePath: z.string().max(160).regex(storagePathPattern),
     altText: z.string().trim().min(1).max(180),
     position: z.number().int().min(0).max(4),
+    data: z.string().optional(),
+    contentType: z.string().optional(),
   })).max(5),
 }).refine(({ media }) => new Set(media.map((item) => item.storagePath)).size === media.length, {
   message: "Each uploaded image must have a unique storage path.",
