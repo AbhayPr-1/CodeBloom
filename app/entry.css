@@ -161,7 +161,7 @@
 .landing-join-secondary a { color: var(--violet); font-weight: 700; }
 .landing-join-secondary a:hover { color: var(--text); }
 
-/* The auth flow shares the landing page's blue/violet brand glow and app surfaces. */
+/* The auth flow shares the landing page's teal/emerald brand glow and app surfaces. */
 .auth-public-page {
   background:
     radial-gradient(ellipse at 16% 26%, color-mix(in srgb, var(--blue) 10%, transparent), transparent 38%),

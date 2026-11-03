@@ -4,8 +4,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { BotanicalWorld } from "./flower-botanical-system";
+import { useTheme } from "@/components/theme-provider";
 
 export function FlowerScene() {
+  const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<BotanicalWorld | null>(null);
   const [bloomProgress, setBloomProgress] = useState(0.0);
@@ -19,6 +21,11 @@ export function FlowerScene() {
     if (p < 0.88) return "Stage 4: Main Petal Bloom";
     return "Stage 5: Full Radiant Bloom";
   };
+
+  // Synchronize 3D botanical world lighting with the active theme
+  useEffect(() => {
+    worldRef.current?.setTheme(theme);
+  }, [theme]);
 
   const handleReplay = useCallback(() => {
     if (worldRef.current) {
@@ -48,10 +55,11 @@ export function FlowerScene() {
         alpha: true,
         powerPreference: "high-performance",
       });
+      renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.15;
+      renderer.toneMappingExposure = 0.92;
     } catch (e) {
       // Graceful fallback for environments without WebGL support (e.g. headless jsdom or disabled GPU)
       console.warn("WebGL not supported in current environment", e);
@@ -72,6 +80,7 @@ export function FlowerScene() {
 
     // 3. Botanical World Setup
     const world = new BotanicalWorld();
+    world.setTheme(theme);
     worldRef.current = world;
     scene.add(world.rootGroup);
 
@@ -203,28 +212,34 @@ export function FlowerScene() {
 
   return (
     <>
-      {/* 3D WebGL Canvas fixed across the entire page */}
+      {/* Dynamic hardware backdrop layer — decoupled from WebGL canvas */}
+      <div
+        className="cb-canvas-backdrop fixed inset-0 -z-10 pointer-events-none"
+        aria-hidden="true"
+      />
+
+      {/* 3D WebGL Canvas with guaranteed transparency */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
         className="fixed inset-0 z-0 w-full h-full pointer-events-none"
         style={{
-          background: "var(--landing-canvas-background)",
+          background: "transparent",
         }}
       />
 
       {/* Floating Botanical Experience HUD / Bloom Controller */}
       <div
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full border border-purple-500/30 bg-[#0d071a]/80 backdrop-blur-xl shadow-[0_0_30px_rgba(168,85,247,0.25)] text-xs text-purple-200 transition-all select-none hover:border-purple-400/50"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full border border-[#7a4458]/45 bg-[#1e0c14]/92 backdrop-blur-xl shadow-[0_0_22px_rgba(0,0,0,0.32)] text-xs text-[#ded0d5] transition-all select-none hover:border-[#a06880]/60"
         role="region"
         aria-label="Interactive Botanical Bloom Controls"
       >
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fuchsia-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-fuchsia-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d84878] opacity-35"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#d84878]"></span>
           </span>
-          <span className="font-mono tracking-wider font-semibold text-fuchsia-300">
+          <span className="font-mono tracking-wider font-semibold text-[#e8b0c8]">
             {getStageName(bloomProgress)}
           </span>
         </div>
@@ -235,7 +250,7 @@ export function FlowerScene() {
         <button
           type="button"
           onClick={handleReplay}
-          className="px-2.5 py-1 rounded-full bg-purple-600/30 hover:bg-purple-600/60 border border-purple-400/40 text-white font-medium transition-all text-[11px] flex items-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(168,85,247,0.3)]"
+          className="px-2.5 py-1 rounded-full bg-[#3a1020]/70 hover:bg-[#5a1830]/80 border border-[#a06080]/45 text-[#f1f2f4] font-medium transition-all text-[11px] flex items-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(0,0,0,0.25)]"
           title="Replay closed-bud-to-full-bloom transformation"
         >
           <span>↺ Replay Bloom</span>
@@ -252,7 +267,7 @@ export function FlowerScene() {
             step="0.01"
             value={bloomProgress}
             onChange={(e) => handleManualBloomChange(parseFloat(e.target.value))}
-            className="w-16 h-1.5 bg-purple-950 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
+            className="w-16 h-1.5 bg-[#3a1020] rounded-lg appearance-none cursor-pointer accent-[#d84878]"
             title="Drag to manually inspect any blooming phase"
           />
         </div>

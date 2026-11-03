@@ -85,15 +85,15 @@ export class BotanicalWorld {
     // Orient flower face directly toward the screen/camera (+Z) as seen in reference images
     this.mainFlowerGroup.rotation.x = 1.44;
 
-    // Lighting setup
-    this.ambientLight = new THREE.AmbientLight(0x2d124d, 1.2);
+    // Lighting setup — crimson/rose-gold metallic palette
+    this.ambientLight = new THREE.AmbientLight(0x3a1a22, 0.55);
     this.rootGroup.add(this.ambientLight);
 
-    this.coreLight = new THREE.PointLight(0xff4fe3, 3.8, 12, 1.2);
+    this.coreLight = new THREE.PointLight(0xe8507a, 2.2, 10, 1.2); // deep rose glow from center
     this.coreLight.position.set(0, 3.2, 0.9);
     this.rootGroup.add(this.coreLight);
 
-    this.rimLight = new THREE.DirectionalLight(0x8b5cf6, 2.0);
+    this.rimLight = new THREE.DirectionalLight(0xd83868, 1.3); // crimson rim accent
     this.rimLight.position.set(4, 8, 5);
     this.rootGroup.add(this.rimLight);
 
@@ -108,17 +108,17 @@ export class BotanicalWorld {
    */
   private buildMainFlower() {
     const tierConfigs = [
-      // Tier 0: Innermost tight core petals (bright lavender / pink)
+      // Tier 0: Innermost tight core petals (bright mint)
       { count: 14, length: 0.85, width: 0.38, arch: 0.25, cup: 0.35, tiltOpen: 0.45, tiltClosed: 0.08, delay: 0.55, dur: 0.35, scale: 0.9 },
       // Tier 1: Inner delicate petals
       { count: 16, length: 1.25, width: 0.48, arch: 0.35, cup: 0.30, tiltOpen: 0.72, tiltClosed: 0.12, delay: 0.58, dur: 0.35, scale: 1.0 },
       // Tier 2: Mid-inner petals
       { count: 18, length: 1.70, width: 0.62, arch: 0.45, cup: 0.26, tiltOpen: 0.95, tiltClosed: 0.16, delay: 0.62, dur: 0.35, scale: 1.15 },
-      // Tier 3: Mid petals (radiant magenta)
+      // Tier 3: Mid petals (radiant jade)
       { count: 20, length: 2.20, width: 0.76, arch: 0.55, cup: 0.22, tiltOpen: 1.18, tiltClosed: 0.20, delay: 0.68, dur: 0.32, scale: 1.25 },
       // Tier 4: Outer large petals
       { count: 22, length: 2.75, width: 0.92, arch: 0.65, cup: 0.18, tiltOpen: 1.42, tiltClosed: 0.24, delay: 0.74, dur: 0.26, scale: 1.35 },
-      // Tier 5: Outermost sweeping petals (deep purple with glowing rims)
+      // Tier 5: Outermost sweeping petals (deep green with glowing rims)
       { count: 24, length: 3.35, width: 1.08, arch: 0.78, cup: 0.14, tiltOpen: 1.62, tiltClosed: 0.28, delay: 0.80, dur: 0.20, scale: 1.45 },
     ];
 
@@ -489,22 +489,33 @@ export class BotanicalWorld {
    * 3. BUILD LUMINOUS PARTICLES / BOTANICAL FIREFLIES
    */
   private buildSporeParticles() {
-    const particleCount = 280;
+    const particleCount = 240;
     const positions = new Float32Array(particleCount * 3);
     const scales = new Float32Array(particleCount);
     const phases = new Float32Array(particleCount);
 
     for (let i = 0; i < particleCount; i++) {
-      // Disperse vertically along the entire botanical height (Y: +5 down to -16)
-      const x = (Math.random() - 0.5) * 8.5;
-      const y = (Math.random() * 22) - 16;
-      const z = (Math.random() - 0.5) * 6.0;
+      // Concentrate a halo around the hero flower; leave the rest drifting along the stem.
+      const isHeroParticle = i < 120;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 2.2 + Math.random() * 1.1;
+      const x = isHeroParticle
+        ? Math.cos(angle) * radius
+        : (Math.random() - 0.5) * 8.5;
+      const y = isHeroParticle
+        ? 3.2 + Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.6
+        : (Math.random() * 22) - 16;
+      const z = isHeroParticle
+        ? 1.1 + Math.random() * 1.2
+        : (Math.random() - 0.5) * 6.0;
 
       positions[i * 3] = x;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
-      scales[i] = 0.6 + Math.random() * 1.4;
+      scales[i] = isHeroParticle
+        ? 0.85 + Math.random() * 0.8
+        : 0.45 + Math.random() * 0.65;
       phases[i] = Math.random() * Math.PI * 2;
     }
 
@@ -517,6 +528,7 @@ export class BotanicalWorld {
     this.materials.push(mat);
 
     this.particlesMesh = new THREE.Points(geom, mat);
+    this.particlesMesh.renderOrder = 3;
     this.rootGroup.add(this.particlesMesh);
   }
 
@@ -662,6 +674,20 @@ export class BotanicalWorld {
       p.pivot.rotation.z = p.deflection.x * 0.5;
       p.pivot.scale.setScalar(currentScale);
     });
+  }
+
+  public setTheme(theme: "dark" | "light") {
+    if (theme === "light") {
+      this.ambientLight.color.setHex(0xf7d0df);
+      this.ambientLight.intensity = 0.88;
+      this.coreLight.intensity = 2.4;
+      this.rimLight.intensity = 1.35;
+    } else {
+      this.ambientLight.color.setHex(0x3a1a22);
+      this.ambientLight.intensity = 0.55;
+      this.coreLight.intensity = 2.2;
+      this.rimLight.intensity = 1.3;
+    }
   }
 
   public dispose() {

@@ -10,6 +10,7 @@ import { LandingDiscovery } from "@/components/landing-discovery";
 import { LandingScrollStory } from "@/components/landing-scroll-story";
 import { LandingHeroInteractive } from "@/components/landing-hero-interactive";
 import { FlowerScene } from "@/components/flower-3d/flower-scene";
+import { CodeBloomLogo } from "@/components/code-bloom-logo";
 import { projects as demoProjects, type Project } from "@/lib/demo-data";
 import { sound } from "@/components/landing-sound";
 
@@ -145,18 +146,7 @@ export function LandingPage() {
       {/* 2. TOP CHROME NAVIGATION                                     */}
       {/* ============================================================ */}
       <header className="top">
-        <Link className="brand" href="/" id="home" aria-label="CodeBloom home">
-          <span className="brand-icon-quad" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-        </Link>
-        <div className="who">
-          <b>CodeBloom</b>
-          <span>developer community</span>
-        </div>
+        <CodeBloomLogo />
 
         <div className="top-actions">
           {/* Sound toggle */}
