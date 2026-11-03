@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/auth-provider";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { projects } from "@/lib/demo-data";
 
 const discovery = [
@@ -89,7 +88,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    if (user) await createSupabaseBrowserClient().auth.signOut();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
     setProfileOpen(false);
     router.replace("/");
     router.refresh();
@@ -101,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="topbar-brand"><button className="icon-button mobile-menu-button" onClick={() => setMobileOpen((open) => !open)} aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} aria-controls="primary-sidebar">{mobileOpen ? <X size={20} /> : <Menu size={20} />}</button><Brand /></div>
       <form className="global-search" role="search" onSubmit={submitSearch}><Search size={16} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search projects, people, and topics" placeholder="Search projects, people, topics…" /><kbd aria-hidden="true">⌘ K</kbd><button type="submit" aria-label="Search"><ArrowRight size={15} /></button></form>
       <div className="topbar-actions"><span className="preview-indicator"><i /> {user ? "Signed in" : "Public preview"}</span><button className="icon-button theme-button" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>{user && <Link className="topbar-bell" href="/notifications" aria-label="Activity"><Bell size={18} /><i /></Link>}<button className="profile-trigger" aria-expanded={profileOpen} aria-haspopup="true" aria-label={user ? "Open account menu" : "Open sign-in menu"} onClick={() => setProfileOpen((open) => !open)}><Avatar initials={user?.email?.slice(0, 2).toUpperCase() ?? "CB"} /><ChevronDown size={13} /></button>
-        {profileOpen && <div className="profile-popover" role="menu"><div className="popover-identity"><Avatar initials={user?.email?.slice(0, 2).toUpperCase() ?? "CB"} /><span><strong>{user?.email ?? "Welcome to CodeBloom"}</strong><small>{user ? "Supabase account" : "Browsing publicly"}</small></span></div>{user ? <><Link role="menuitem" href="/settings/profile" onClick={() => setProfileOpen(false)}>Developer profile</Link><Link role="menuitem" href="/settings" onClick={() => setProfileOpen(false)}>Account settings</Link><button className="profile-signout" type="button" role="menuitem" onClick={() => void signOut()}>Sign out</button></> : <><Link role="menuitem" href="/login" onClick={() => setProfileOpen(false)}>Sign in</Link><Link role="menuitem" href="/signup" onClick={() => setProfileOpen(false)}>Create account</Link></>}</div>}
+        {profileOpen && <div className="profile-popover" role="menu"><div className="popover-identity"><Avatar initials={user?.email?.slice(0, 2).toUpperCase() ?? "CB"} /><span><strong>{user?.email ?? "Welcome to CodeBloom"}</strong><small>{user ? "CodeBloom account" : "Browsing publicly"}</small></span></div>{user ? <><Link role="menuitem" href="/settings/profile" onClick={() => setProfileOpen(false)}>Developer profile</Link><Link role="menuitem" href="/settings" onClick={() => setProfileOpen(false)}>Account settings</Link><button className="profile-signout" type="button" role="menuitem" onClick={() => void signOut()}>Sign out</button></> : <><Link role="menuitem" href="/login" onClick={() => setProfileOpen(false)}>Sign in</Link><Link role="menuitem" href="/signup" onClick={() => setProfileOpen(false)}>Create account</Link></>}</div>}
       </div>
     </header>
     {mobileOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}

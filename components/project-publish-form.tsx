@@ -7,18 +7,24 @@ import { useCommunity } from "@/components/community-provider";
 import { useAuth } from "@/components/auth-provider";
 import { PageHeading } from "@/components/ui/page-state";
 import { PreviewNote } from "@/components/ui/preview-note";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { getSupabaseConfig } from "@/lib/supabase/config";
 
 type DraftResponse = { project?: { id: string; slug: string }; error?: string };
 const maxImages = 5;
 const maxImageBytes = 5 * 1024 * 1024;
 const imageExtensions: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Unable to read selected image file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ProjectPublishForm() {
   const { publish } = useCommunity();
-  const { user } = useAuth();
-  const supabaseConfigured = Boolean(getSupabaseConfig());
+  const { user, configured } = useAuth();
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
@@ -70,36 +76,37 @@ export function ProjectPublishForm() {
     let draftSlug = "";
     let draftId = "";
     const uploadedPaths: string[] = [];
-    let browserStorage: ReturnType<typeof createSupabaseBrowserClient>["storage"] | null = null;
+
     try {
-      if (!supabaseConfigured) {
-        if (selectedMedia.length) throw new Error("Screenshot uploads require the configured Supabase project.");
+      if (!configured || !user) {
+        if (selectedMedia.length) throw new Error("Screenshot uploads require a signed-in account.");
         publish({ ...payload, repo: payload.repositoryUrl });
       } else {
-        if (!user) throw new Error("Sign in again before publishing this project.");
         const response = await fetch("/api/projects", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
         const created = await response.json() as DraftResponse;
-        if (!response.ok || !created.project?.id || !created.project.slug) throw new Error(created.error ?? "Unable to create a private project draft.");
+        if (!response.ok || !created.project?.id || !created.project.slug) {
+          throw new Error(created.error ?? "Unable to create a private project draft.");
+        }
         draftId = created.project.id;
         draftSlug = created.project.slug;
 
-        browserStorage = createSupabaseBrowserClient().storage;
-        const media: Array<{ storagePath: string; altText: string; position: number }> = [];
+        const media: Array<{ storagePath: string; altText: string; position: number; data: string; contentType: string }> = [];
         for (const [position, file] of selectedMedia.entries()) {
-          const extension = imageExtensions[file.type];
+          const extension = imageExtensions[file.type] ?? "png";
           const storagePath = `${draftId}/${user.id}/${crypto.randomUUID()}.${extension}`;
-          const { error: uploadError } = await browserStorage.from("project-media").upload(storagePath, file, {
-            cacheControl: "3600",
-            contentType: file.type,
-            upsert: false,
-          });
-          if (uploadError) throw new Error("A screenshot could not be uploaded. Your project is still private while cleanup runs.");
+          const dataUrl = await readFileAsDataUrl(file);
           uploadedPaths.push(storagePath);
-          media.push({ storagePath, altText: altTexts[position]!.trim(), position });
+          media.push({
+            storagePath,
+            altText: altTexts[position]!.trim(),
+            position,
+            data: dataUrl,
+            contentType: file.type,
+          });
         }
 
         if (media.length) {
@@ -109,21 +116,25 @@ export function ProjectPublishForm() {
             body: JSON.stringify({ media }),
           });
           const mediaBody = await mediaResponse.json() as { error?: string };
-          if (!mediaResponse.ok) throw new Error(mediaBody.error ?? "Unable to attach screenshots to this project.");
+          if (!mediaResponse.ok) {
+            throw new Error(mediaBody.error ?? "Unable to attach screenshots to this project.");
+          }
         }
 
         const publishResponse = await fetch(`/api/projects/${encodeURIComponent(draftSlug)}/publish`, { method: "POST" });
         const publishBody = await publishResponse.json() as { error?: string };
-        if (!publishResponse.ok) throw new Error(publishBody.error ?? "Unable to publish this project.");
+        if (!publishResponse.ok) {
+          throw new Error(publishBody.error ?? "Unable to publish this project.");
+        }
         setSavedSlug(draftSlug);
       }
+
       form.reset();
       setSelectedMedia([]);
       setAltTexts([]);
       setStatus("saved");
     } catch (cause) {
-      if (draftSlug && browserStorage) {
-        if (uploadedPaths.length) await browserStorage.from("project-media").remove(uploadedPaths).catch(() => undefined);
+      if (draftSlug) {
         await fetch(`/api/projects/${encodeURIComponent(draftSlug)}`, {
           method: "DELETE",
           headers: { "content-type": "application/json" },
@@ -156,6 +167,6 @@ export function ProjectPublishForm() {
       {selectedMedia.length > 0 && <div className="publish-media-list" aria-label="Selected project screenshots">{selectedMedia.map((file, index) => <div className="publish-media-item" key={`${file.name}-${file.size}-${index}`}><span>{file.name}</span><label>Alt text<input required maxLength={180} value={altTexts[index] ?? ""} placeholder="What does this screenshot show?" onChange={(event) => setAltTexts((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} /></label><button type="button" className="icon-button subtle" aria-label={`Remove ${file.name}`} onClick={() => { setSelectedMedia((current) => current.filter((_, itemIndex) => itemIndex !== index)); setAltTexts((current) => current.filter((_, itemIndex) => itemIndex !== index)); }}><X size={16} /></button></div>)}</div>}
       <div className="form-actions"><Link className="button button-outline" href="/">Cancel</Link><button className="button button-primary" type="submit" disabled={status === "saving"}>{status === "saving" ? <span className="spinner" aria-hidden="true" /> : <Send size={16} />}{status === "saving" ? "Publishing…" : "Publish project"}</button></div>
     </form>
-    <PreviewNote>{supabaseConfigured ? "Publishing requires a signed-in account and the reviewed Phase 4 database/Storage migration. Uploads stay in a private bucket; a project becomes public only after every screenshot has been validated." : "Without Supabase configuration, project publishing is a browser-only preview; screenshots are not uploaded."}</PreviewNote>
+    <PreviewNote>{configured && user ? "Publishing requires a signed-in account. Uploaded screenshots are stored in MongoDB Atlas and verified before publishing." : "Sign in to publish your project live to MongoDB Atlas. Without an account, preview mode will run locally in this browser."}</PreviewNote>
   </section>;
 }
