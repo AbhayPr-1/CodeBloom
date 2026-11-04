@@ -54,13 +54,15 @@ export default async function CatchAllPage({ params, searchParams }: PageProps) 
 
   if (section === "login" && slug.length === 1) {
     if (await getAuthenticatedUser()) redirect(next);
-    return <AuthPage mode="login" next={next} authError={single(search.auth_error) === "callback"} />;
+    redirect(`/?auth=login${next !== "/dashboard" ? `&next=${encodeURIComponent(next)}` : ""}`);
   }
   if (section === "signup" && slug.length === 1) {
     if (await getAuthenticatedUser()) redirect(next);
-    return <AuthPage mode="signup" next={next} />;
+    redirect(`/?auth=signup${next !== "/dashboard" ? `&next=${encodeURIComponent(next)}` : ""}`);
   }
-  if (section === "forgot-password" && slug.length === 1) return <AuthPage mode="forgot" next={next} />;
+  if (section === "forgot-password" && slug.length === 1) {
+    redirect(`/?auth=forgot${next !== "/dashboard" ? `&next=${encodeURIComponent(next)}` : ""}`);
+  }
   if (section === "reset-password" && slug.length === 1) return <AuthPage mode="reset" next={next} />;
   if (section === "explore") {
     const initialQuery = single(search.q) ?? "";

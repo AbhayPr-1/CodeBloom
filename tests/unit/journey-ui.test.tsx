@@ -167,7 +167,7 @@ describe("entry and first-run journey", () => {
 
     try {
       render(<LandingPage />);
-      await waitFor(() => expect(screen.getByRole("button", { name: "Turn haptic feedback off" })).toHaveAttribute("aria-pressed", "true"));
+      expect(screen.queryByRole("button", { name: /haptic/i })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("link", { name: "Explore as a guest" }), { detail: 1 });
       expect(vibrate).toHaveBeenCalledWith(8);
     } finally {
@@ -176,7 +176,7 @@ describe("entry and first-run journey", () => {
     }
   });
 
-  it("plays distinct story cues once per chapter transition and respects the haptics toggle", async () => {
+  it("plays distinct story cues once per chapter transition with permanent haptics", async () => {
     const originalVibrate = Object.getOwnPropertyDescriptor(navigator, "vibrate");
     const vibrate = vi.fn(() => true);
     Object.defineProperty(navigator, "vibrate", { configurable: true, value: vibrate });
@@ -229,12 +229,6 @@ describe("entry and first-run journey", () => {
       notifyChapter(2);
       expect(mocks.sound.playStoryTransition.mock.calls).toEqual([[1], [0], [2]]);
       expect(vibrate.mock.calls).toEqual([[[9, 34, 9]], [[12]], [[7, 22, 12, 22, 18]]]);
-
-      fireEvent.click(screen.getByRole("button", { name: "Turn haptic feedback off" }));
-      vibrate.mockClear();
-      notifyChapter(1);
-      expect(mocks.sound.playStoryTransition).toHaveBeenLastCalledWith(1);
-      expect(vibrate).not.toHaveBeenCalled();
     } finally {
       if (originalVibrate) Object.defineProperty(navigator, "vibrate", originalVibrate);
       else Reflect.deleteProperty(navigator, "vibrate");

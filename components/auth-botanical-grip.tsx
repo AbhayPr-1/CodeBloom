@@ -124,30 +124,30 @@ function createTranslucentVineBarkMaterial(isLight: boolean): THREE.ShaderMateri
         float tipDist = abs(vUv.x - uGrowProgress);
         float tipGlow = smoothstep(0.09, 0.0, tipDist) * step(0.01, uGrowProgress) * step(uGrowProgress, 0.995);
 
-        // Home page bark base: deep near-black with warm crimson undertone
-        vec3 darkBark = mix(vec3(0.12, 0.05, 0.07), vec3(0.28, 0.08, 0.15), uIsLight);
+        // Home page bark base: deep near-black with rich botanical emerald undertone
+        vec3 darkBark = mix(vec3(0.04, 0.10, 0.06), vec3(0.08, 0.22, 0.12), uIsLight);
 
-        // Home page rose-crimson specular sheen
+        // Home page emerald specular sheen
         vec3 lightDir = normalize(uLightPos - vWorldPosition);
         vec3 halfVec = normalize(lightDir + viewDir);
         float spec = pow(max(0.0, dot(normal, halfVec)), 20.0);
-        vec3 highlight = mix(vec3(0.85, 0.24, 0.42), vec3(0.78, 0.20, 0.38), uIsLight) * spec * 0.75;
+        vec3 highlight = mix(vec3(0.24, 0.85, 0.45), vec3(0.18, 0.72, 0.35), uIsLight) * spec * 0.75;
 
-        // Home page glowing crimson vein energy pulse descending through the stem
+        // Home page glowing emerald vein energy pulse descending through the stem
         float energyPulse = sin(vUv.x * 20.0 - uTime * 2.5) * 0.5 + 0.5;
         float energyWave = pow(energyPulse, 5.0);
-        vec3 pulseColor = mix(vec3(0.95, 0.26, 0.52), vec3(0.85, 0.22, 0.45), uIsLight) * energyWave * 0.85;
+        vec3 pulseColor = mix(vec3(0.22, 0.95, 0.45), vec3(0.18, 0.82, 0.38), uIsLight) * energyWave * 0.85;
 
-        // Home page rim fresnel on branch contours — metallic rose-gold
+        // Home page rim fresnel on branch contours — metallic emerald
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, 2.4);
-        vec3 rim = mix(vec3(0.96, 0.46, 0.68), vec3(0.88, 0.40, 0.60), uIsLight) * fresnel * 0.85;
+        vec3 rim = mix(vec3(0.46, 0.96, 0.62), vec3(0.38, 0.85, 0.52), uIsLight) * fresnel * 0.85;
 
         // Subsurface inner radiance
-        vec3 innerRadiance = mix(vec3(0.45, 0.08, 0.22), vec3(0.60, 0.14, 0.30), uIsLight) * (1.0 - NdotV * 0.5) * 0.4;
+        vec3 innerRadiance = mix(vec3(0.08, 0.45, 0.18), vec3(0.12, 0.55, 0.22), uIsLight) * (1.0 - NdotV * 0.5) * 0.4;
 
         // Tip glow bloom
-        vec3 tipColor = vec3(1.0, 0.88, 0.94) * tipGlow * 1.8;
+        vec3 tipColor = vec3(0.88, 1.0, 0.92) * tipGlow * 1.8;
 
         vec3 color = darkBark + innerRadiance + highlight + pulseColor + rim + tipColor;
 
@@ -203,29 +203,29 @@ function createTranslucentVineLeafMaterial(isLight: boolean): THREE.ShaderMateri
         if (!gl_FrontFacing) normal = -normal;
         vec3 viewDir = normalize(vViewPosition);
 
-        // Home page leaf base: deep crimson-velvet
-        vec3 leafBase = mix(vec3(0.14, 0.04, 0.08), vec3(0.28, 0.07, 0.14), uIsLight);
+        // Home page leaf base: deep forest-velvet
+        vec3 leafBase = mix(vec3(0.04, 0.12, 0.06), vec3(0.08, 0.24, 0.12), uIsLight);
 
-        // Home page delicate rose-metallic veins
+        // Home page delicate mint-metallic veins
         float midrib = 1.0 - smoothstep(0.0, 0.06, abs(vUv.x - 0.5));
         float lateralVeins = sin((vUv.y - abs(vUv.x - 0.5) * 0.5) * 35.0);
         lateralVeins = smoothstep(0.75, 1.0, lateralVeins) * 0.6;
         
         // Pulsing vein glow
         float veinPulse = 1.0 + 0.18 * sin(uTime * 2.2 + vUv.y * 3.0);
-        vec3 veinColor = mix(vec3(0.88, 0.28, 0.52), vec3(0.80, 0.22, 0.45), uIsLight) * (midrib * 1.1 + lateralVeins * 0.9) * veinPulse;
+        vec3 veinColor = mix(vec3(0.28, 0.88, 0.48), vec3(0.20, 0.78, 0.38), uIsLight) * (midrib * 1.1 + lateralVeins * 0.9) * veinPulse;
 
-        // Home page softly lit margin — pale rose-gold shimmer
+        // Home page softly lit margin — pale mint-gold shimmer
         float margin = smoothstep(0.78, 0.98, abs(vUv.x - 0.5) * 2.0);
-        vec3 marginGlow = mix(vec3(0.98, 0.55, 0.72), vec3(0.88, 0.44, 0.64), uIsLight) * margin * 0.9;
+        vec3 marginGlow = mix(vec3(0.55, 0.98, 0.68), vec3(0.40, 0.85, 0.52), uIsLight) * margin * 0.9;
 
-        // Home page fresnel sheen — metallic pink
+        // Home page fresnel sheen — metallic emerald
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, 2.2);
-        vec3 sheen = mix(vec3(0.92, 0.38, 0.58), vec3(0.82, 0.30, 0.50), uIsLight) * fresnel * 0.55;
+        vec3 sheen = mix(vec3(0.38, 0.92, 0.52), vec3(0.28, 0.80, 0.42), uIsLight) * fresnel * 0.55;
 
         // Subsurface scattering radiance
-        vec3 sss = mix(vec3(0.55, 0.12, 0.28), vec3(0.70, 0.18, 0.38), uIsLight) * 0.35;
+        vec3 sss = mix(vec3(0.12, 0.55, 0.22), vec3(0.16, 0.62, 0.28), uIsLight) * 0.35;
 
         vec3 finalColor = leafBase + sss + veinColor + marginGlow + sheen;
 
@@ -248,8 +248,8 @@ function createTranslucentVineLeafMaterial(isLight: boolean): THREE.ShaderMateri
  */
 function createLivelyBudMaterial(isLight: boolean): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: isLight ? new THREE.Color("#aa3865") : new THREE.Color("#f0c8d8"),
-    emissive: new THREE.Color("#c84878"),
+    color: isLight ? new THREE.Color("#15803d") : new THREE.Color("#dcfce7"),
+    emissive: new THREE.Color("#16a34a"),
     emissiveIntensity: isLight ? 1.0 : 1.3,
     roughness: 0.22,
     metalness: 0.72,

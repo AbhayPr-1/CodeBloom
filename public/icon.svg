@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="tileBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1f12" />
+      <stop offset="100%" stop-color="#040f08" />
+    </linearGradient>
+    <linearGradient id="sproutGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#86efac" />
+      <stop offset="100%" stop-color="#22c55e" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle rounded background -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#tileBg)" stroke="#16a34a" stroke-width="2" stroke-opacity="0.7" />
+
+  <!-- Botanical Sprout Mark -->
+  <svg x="13" y="13" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="url(#sproutGrad)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+    <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+    <path d="M5 21h14" />
+  </svg>
+</svg>

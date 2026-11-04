@@ -14,8 +14,18 @@ export const metadata: Metadata = {
   title: { default: "CodeBloom — Discover. Discuss. Build upon.", template: "%s · CodeBloom" },
   description: "A project-centered developer community for discovering, discussing, and building upon software projects.",
   robots: { index: false, follow: false },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <html lang="en" suppressHydrationWarning><body><ThemeProvider><AuthProvider><CommunityProvider><AppShell>{children}</AppShell></CommunityProvider></AuthProvider></ThemeProvider></body></html>;
+  return <html lang="en" data-theme="dark" suppressHydrationWarning><body><ThemeProvider><AuthProvider><CommunityProvider><AppShell>{children}</AppShell></CommunityProvider></AuthProvider></ThemeProvider></body></html>;
 }

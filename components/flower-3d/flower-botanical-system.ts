@@ -85,15 +85,15 @@ export class BotanicalWorld {
     // Orient flower face directly toward the screen/camera (+Z) as seen in reference images
     this.mainFlowerGroup.rotation.x = 1.44;
 
-    // Lighting setup — crimson/rose-gold metallic palette
-    this.ambientLight = new THREE.AmbientLight(0x3a1a22, 0.55);
+    // Lighting setup — emerald/botanical green metallic palette
+    this.ambientLight = new THREE.AmbientLight(0x0e2a16, 0.55);
     this.rootGroup.add(this.ambientLight);
 
-    this.coreLight = new THREE.PointLight(0xe8507a, 2.2, 10, 1.2); // deep rose glow from center
+    this.coreLight = new THREE.PointLight(0x22c55e, 2.2, 10, 1.2); // vibrant emerald glow from center
     this.coreLight.position.set(0, 3.2, 0.9);
     this.rootGroup.add(this.coreLight);
 
-    this.rimLight = new THREE.DirectionalLight(0xd83868, 1.3); // crimson rim accent
+    this.rimLight = new THREE.DirectionalLight(0x16a34a, 1.3); // emerald rim accent
     this.rimLight.position.set(4, 8, 5);
     this.rootGroup.add(this.rimLight);
 
@@ -678,12 +678,12 @@ export class BotanicalWorld {
 
   public setTheme(theme: "dark" | "light") {
     if (theme === "light") {
-      this.ambientLight.color.setHex(0xf7d0df);
+      this.ambientLight.color.setHex(0xdcfce7);
       this.ambientLight.intensity = 0.88;
       this.coreLight.intensity = 2.4;
       this.rimLight.intensity = 1.35;
     } else {
-      this.ambientLight.color.setHex(0x3a1a22);
+      this.ambientLight.color.setHex(0x0e2a16);
       this.ambientLight.intensity = 0.55;
       this.coreLight.intensity = 2.2;
       this.rimLight.intensity = 1.3;

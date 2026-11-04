@@ -5,6 +5,7 @@ import { useState, useEffect, useSyncExternalStore, useCallback, useRef } from "
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
+import { AuthGlassDialog, type AuthDialogMode } from "@/components/auth-glass-dialog";
 import { ProjectArtwork } from "@/components/project-artwork";
 import { LandingDiscovery } from "@/components/landing-discovery";
 import { LandingScrollStory } from "@/components/landing-scroll-story";
@@ -13,11 +14,9 @@ import { FlowerScene } from "@/components/flower-3d/flower-scene";
 import { CodeBloomLogo } from "@/components/code-bloom-logo";
 import { projects as demoProjects, type Project } from "@/lib/demo-data";
 import { sound } from "@/components/landing-sound";
+import { tactile } from "@/components/tactile-haptics";
 
 const previewTopics = [...new Set(demoProjects.flatMap((project) => project.tags))];
-const subscribeToHapticSupport = () => () => {};
-const getHapticSupport = () => typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
-const getServerHapticSupport = () => false;
 const storyHapticPatterns: VibratePattern[] = [[12], [9, 34, 9], [7, 22, 12, 22, 18]];
 
 export function LandingPage() {
@@ -26,9 +25,21 @@ export function LandingPage() {
 
   // Sensory feedback is controllable and never starts audio automatically.
   const [soundEnabled, setSoundEnabled] = useState(false);
-  const hapticsAvailable = useSyncExternalStore(subscribeToHapticSupport, getHapticSupport, getServerHapticSupport);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
-  const hapticsEnabledRef = useRef(hapticsEnabled);
+
+  // Auth modal dialog state (direct landing page glassmorphism modal)
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AuthDialogMode>("login");
+
+  // Read URL search query for ?auth=login or ?auth=signup
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const authParam = params.get("auth");
+    if (authParam === "login" || authParam === "signup" || authParam === "forgot") {
+      setAuthModalMode(authParam as AuthDialogMode);
+      setAuthModalOpen(true);
+    }
+  }, []);
 
   // Auth gate dialog state
   const [gateOpen, setGateOpen] = useState(false);
@@ -85,22 +96,17 @@ export function LandingPage() {
     setSoundEnabled(next);
   }
 
-  function toggleHaptics() {
-    const next = !hapticsEnabled;
-    hapticsEnabledRef.current = next;
-    setHapticsEnabled(next);
-  }
-
   const handleStoryChapterChange = useCallback((chapterIndex: number) => {
     sound.playStoryTransition(chapterIndex);
     const pattern = storyHapticPatterns[chapterIndex];
-    if (!pattern || !hapticsEnabledRef.current || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+    if (!pattern || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
 
     try {
       navigator.vibrate(pattern);
     } catch {
       // Vibration can be blocked by browser policy; the chapter transition remains visual.
     }
+    tactile.playMechanicalImpulse("story");
   }, []);
 
   function handleProtectedAction(actionName: string, destination: string) {
@@ -109,7 +115,8 @@ export function LandingPage() {
     } else {
       setGateAction(actionName);
       setGateReturnTo(destination);
-      setGateOpen(true);
+      setAuthModalMode("login");
+      setAuthModalOpen(true);
     }
   }
 
@@ -121,13 +128,14 @@ export function LandingPage() {
     if (!control || control.matches(":disabled, [aria-disabled='true']")) return;
 
     sound.playClick();
-    if (hapticsEnabled && event.detail > 0 && typeof navigator.vibrate === "function") {
+    if (event.detail > 0 && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
       try {
         navigator.vibrate(8);
       } catch {
-        // Haptic APIs can be blocked by browser policy; visual/audio feedback remains available.
+        // Haptic APIs can be blocked by browser policy
       }
     }
+    tactile.trigger("light");
   }
 
   function handleSubmitBrief(e: React.FormEvent) {
@@ -178,19 +186,6 @@ export function LandingPage() {
             <span className="snd-t">sound</span>
           </button>
 
-          {hapticsAvailable && (
-            <button
-              className="snd haptic-toggle"
-              type="button"
-              aria-pressed={hapticsEnabled}
-              aria-label={hapticsEnabled ? "Turn haptic feedback off" : "Turn haptic feedback on"}
-              onClick={toggleHaptics}
-            >
-              <span aria-hidden="true">⌁</span>
-              <span className="snd-t">haptics</span>
-            </button>
-          )}
-
           {/* Theme toggle */}
           <button
             className="snd"
@@ -203,15 +198,31 @@ export function LandingPage() {
             {theme === "dark" ? "LIGHT" : "DARK"}
           </button>
 
-          {/* Authentication Links */}
+          {/* Authentication Links -> Opens Glassmorphic Auth Dialog directly on Landing Page */}
           <Link href="#trails" className="top-auth-btn btn-text top-explore-link">
             Explore
           </Link>
-          <Link href="/login" className="top-auth-btn btn-text">
-            Sign in
+          <Link
+            href="/login"
+            className="top-auth-btn btn-text"
+            onClick={(e) => {
+              e.preventDefault();
+              setAuthModalMode("login");
+              setAuthModalOpen(true);
+            }}
+          >
+            <span>Sign in</span>
           </Link>
-          <Link href="/signup" className="top-auth-btn btn-solid">
-            Create account
+          <Link
+            href="/signup"
+            className="top-auth-btn btn-solid"
+            onClick={(e) => {
+              e.preventDefault();
+              setAuthModalMode("signup");
+              setAuthModalOpen(true);
+            }}
+          >
+            <span>Create account</span>
           </Link>
         </div>
       </header>
@@ -231,7 +242,15 @@ export function LandingPage() {
           </p>
 
           <div className="screen-actions">
-            <Link href="/signup" className="btn">
+            <Link
+              href="/signup"
+              className="btn"
+              onClick={(e) => {
+                e.preventDefault();
+                setAuthModalMode("signup");
+                setAuthModalOpen(true);
+              }}
+            >
               <span>Create your account</span>
               <svg className="ico" aria-hidden="true">
                 <use href="#i-right" />
@@ -428,7 +447,15 @@ export function LandingPage() {
               </Link>
             </li>
             <li>
-              <Link className="sw-grid" href="/signup">
+              <Link
+                className="sw-grid"
+                href="/signup"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAuthModalMode("signup");
+                  setAuthModalOpen(true);
+                }}
+              >
                 <span className="sw-label">04</span>
                 <b>Create account</b>
                 <span className="sw-note">join the garden</span>
@@ -524,6 +551,20 @@ export function LandingPage() {
         onClose={() => setGateOpen(false)}
         action={gateAction}
         returnTo={gateReturnTo}
+      />
+
+      {/* Glassmorphic Auth Dialog (Direct on Landing Page) */}
+      <AuthGlassDialog
+        open={authModalOpen}
+        onClose={() => {
+          setAuthModalOpen(false);
+          if (typeof window !== "undefined" && window.location.search.includes("auth=")) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        }}
+        initialMode={authModalMode}
+        next={gateReturnTo}
+        actionMessage={gateAction !== "participate in this project" ? gateAction : undefined}
       />
     </div>
   );

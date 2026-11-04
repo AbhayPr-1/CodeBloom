@@ -15,7 +15,7 @@ function readTheme(): Theme {
     if (saved === "dark" || saved === "light") return saved;
   } catch { if (memoryPreference) return memoryPreference; }
   if (memoryPreference) return memoryPreference;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "dark";
 }
 
 function subscribe(listener: () => void) {

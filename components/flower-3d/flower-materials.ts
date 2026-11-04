@@ -9,30 +9,30 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
   const tierRatio = tierIndex / Math.max(1, totalTiers - 1);
 
   const baseColors = [
-    new THREE.Color("#3a1a22"), // tier 0 — deep burgundy shadow
-    new THREE.Color("#35161f"),
-    new THREE.Color("#30121c"),
-    new THREE.Color("#2b0f18"),
-    new THREE.Color("#260c15"),
-    new THREE.Color("#220913"), // tier 5 — near-black crimson
+    new THREE.Color("#0c2314"), // tier 0 — deep forest shadow
+    new THREE.Color("#091d10"),
+    new THREE.Color("#07170d"),
+    new THREE.Color("#06130a"),
+    new THREE.Color("#040e07"),
+    new THREE.Color("#020804"), // tier 5 — obsidian emerald shadow
   ];
 
   const midColors = [
-    new THREE.Color("#b84470"), // inner: rich rose-metallic
-    new THREE.Color("#aa3865"),
-    new THREE.Color("#9c2c5a"),
-    new THREE.Color("#8e2050"),
-    new THREE.Color("#801445"),
-    new THREE.Color("#72083a"), // outer: deep carmine
+    new THREE.Color("#16a34a"), // inner: rich emerald botanical green
+    new THREE.Color("#15803d"),
+    new THREE.Color("#10b981"),
+    new THREE.Color("#059669"),
+    new THREE.Color("#047857"),
+    new THREE.Color("#065f46"), // outer: deep emerald
   ];
 
   const rimColors = [
-    new THREE.Color("#f7c4d8"), // inner rim: pale rose-gold sparkle
-    new THREE.Color("#f0a8c4"),
-    new THREE.Color("#e888af"),
-    new THREE.Color("#e0689a"),
-    new THREE.Color("#d84886"),
-    new THREE.Color("#cc2872"), // outer rim: vivid magenta-crimson edge
+    new THREE.Color("#bbf7d0"), // inner rim: mint sparkle
+    new THREE.Color("#86efac"),
+    new THREE.Color("#4ade80"),
+    new THREE.Color("#22c55e"),
+    new THREE.Color("#16a34a"),
+    new THREE.Color("#15803d"), // outer rim: vivid emerald edge
   ];
 
   const baseColor = baseColors[Math.min(tierIndex, baseColors.length - 1)];
@@ -123,8 +123,8 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, uFresnelPower);
         
-        // Iridescent color shift on extreme rim — rose-gold to pale champagne shimmer
-        vec3 iridescence = mix(uRimColor, vec3(1.0, 0.82, 0.78), sin(uTime + vUv.y * 4.0) * 0.22 + 0.22);
+        // Iridescent color shift on extreme rim — emerald to pale mint shimmer
+        vec3 iridescence = mix(uRimColor, vec3(0.85, 1.0, 0.90), sin(uTime + vUv.y * 4.0) * 0.22 + 0.22);
         vec3 rimGlow = iridescence * fresnel * 0.65;
 
         // 3. Subsurface Scattering from glowing flower center
@@ -150,7 +150,7 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
         ));
         float flakeSpec = pow(max(0.0, dot(flakeNormal, halfVec)), 42.0);
         float sparkleGlint = step(0.68, flakeHash) * flakeDot * flakeSpec * (0.8 + 0.4 * sin(uTime * 4.0 + flakeHash * 6.28));
-        vec3 metallicSparkle = mix(uRimColor, vec3(1.0, 0.88, 0.94), 0.7) * sparkleGlint * 2.2;
+        vec3 metallicSparkle = mix(uRimColor, vec3(0.88, 1.0, 0.92), 0.7) * sparkleGlint * 2.2;
 
         // Metallic reflection sheen
         vec3 metallicSheen = mix(uMidColor, uRimColor, 0.5) * pow(max(0.0, dot(normal, halfVec)), 8.0) * 0.35;
@@ -211,23 +211,23 @@ export function createBarkMaterial(): THREE.ShaderMaterial {
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
 
-        // Deep lacquered dark bark base — near-black with warm crimson undertone
-        vec3 darkBark = vec3(0.12, 0.05, 0.07);
+        // Deep lacquered dark bark base — dark forest with obsidian green undertone
+        vec3 darkBark = vec3(0.04, 0.10, 0.06);
         
-        // Rose-crimson specular sheen
+        // Emerald specular sheen
         vec3 lightDir = normalize(uLightPos - vWorldPosition);
         vec3 halfVec = normalize(lightDir + viewDir);
         float spec = pow(max(0.0, dot(normal, halfVec)), 20.0);
-        vec3 jadeHighlight = vec3(0.85, 0.24, 0.42) * spec * 0.7;
+        vec3 jadeHighlight = vec3(0.24, 0.85, 0.45) * spec * 0.7;
 
-        // Glowing crimson vein energy wave descending through the stem
+        // Glowing emerald vein energy wave descending through the stem
         float energyPulse = sin(vUv.x * 20.0 - uTime * 2.5) * 0.5 + 0.5;
         float energyWave = pow(energyPulse, 6.0);
-        vec3 pulseColor = vec3(0.95, 0.26, 0.52) * energyWave * 0.85;
+        vec3 pulseColor = vec3(0.22, 0.95, 0.45) * energyWave * 0.85;
 
-        // Rim fresnel on branch contours — metallic rose-gold
+        // Rim fresnel on branch contours — metallic emerald
         float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.6);
-        vec3 rim = vec3(0.96, 0.46, 0.68) * fresnel * 0.85;
+        vec3 rim = vec3(0.46, 0.96, 0.62) * fresnel * 0.85;
 
         vec3 color = darkBark + jadeHighlight + pulseColor + rim;
         gl_FragColor = vec4(color, 1.0);
@@ -273,23 +273,23 @@ export function createLeafMaterial(): THREE.ShaderMaterial {
         if (!gl_FrontFacing) normal = -normal;
         vec3 viewDir = normalize(vViewPosition);
 
-        // Deep crimson-velvet base
-        vec3 leafBase = vec3(0.14, 0.04, 0.08);
+        // Deep forest velvet base
+        vec3 leafBase = vec3(0.04, 0.12, 0.06);
 
-        // Delicate rose-metallic veins
+        // Delicate mint-metallic veins
         float midrib = 1.0 - smoothstep(0.0, 0.06, abs(vUv.x - 0.5));
         float lateralVeins = sin((vUv.y - abs(vUv.x - 0.5) * 0.5) * 35.0);
         lateralVeins = smoothstep(0.75, 1.0, lateralVeins) * 0.6;
 
-        vec3 veinColor = vec3(0.88, 0.28, 0.52) * (midrib * 0.9 + lateralVeins);
+        vec3 veinColor = vec3(0.28, 0.88, 0.45) * (midrib * 0.9 + lateralVeins);
 
-        // Softly lit margin — pale rose-gold shimmer
+        // Softly lit margin — pale mint shimmer
         float margin = smoothstep(0.78, 0.98, abs(vUv.x - 0.5) * 2.0);
-        vec3 marginGlow = vec3(0.98, 0.55, 0.72) * margin * 0.9;
+        vec3 marginGlow = vec3(0.55, 0.98, 0.68) * margin * 0.9;
 
-        // Fresnel sheen — metallic pink
+        // Fresnel sheen — metallic emerald
         float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.2);
-        vec3 sheen = vec3(0.92, 0.38, 0.58) * fresnel * 0.5;
+        vec3 sheen = vec3(0.38, 0.92, 0.52) * fresnel * 0.5;
 
         vec3 finalColor = leafBase + veinColor + marginGlow + sheen;
         gl_FragColor = vec4(finalColor, 0.95);
@@ -306,8 +306,8 @@ export function createLeafMaterial(): THREE.ShaderMaterial {
  */
 export function createStamenMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: new THREE.Color("#f0c8d8"),      // pale rose-gold
-    emissive: new THREE.Color("#c84878"),   // deep crimson radiance
+    color: new THREE.Color("#dcfce7"),      // pale mint green
+    emissive: new THREE.Color("#15803d"),   // rich emerald radiance
     emissiveIntensity: 1.1,
     roughness: 0.22,
     metalness: 0.72,                        // strong metallic sheen
@@ -342,9 +342,9 @@ export function createSporeParticleMaterial(): THREE.ShaderMaterial {
         // Size attenuation
         gl_PointSize = (aScale * 62.0 / -mvPosition.z) * (0.8 + 0.3 * sin(uTime * 3.0 + aPhase));
 
-        // Warm crimson-to-rose-gold metallic sparkle tones
+        // Warm emerald-to-mint metallic sparkle tones
         float t = sin(uTime * 1.2 + aPhase) * 0.5 + 0.5;
-        vColor = mix(vec3(0.82, 0.18, 0.42), vec3(1.0, 0.72, 0.82), t);
+        vColor = mix(vec3(0.18, 0.82, 0.42), vec3(0.72, 1.0, 0.82), t);
         vAlpha = 0.26 + 0.18 * sin(uTime * 2.0 + aPhase);
       }
     `,

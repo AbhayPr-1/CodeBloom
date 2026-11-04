@@ -53,10 +53,11 @@ export function FlowerScene() {
         canvas,
         antialias: true,
         alpha: true,
-        powerPreference: "high-performance",
+        powerPreference: "default",
+        failIfMajorPerformanceCaveat: false,
       });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 0.92;
@@ -69,14 +70,15 @@ export function FlowerScene() {
     // 2. Scene & Camera Setup
     const scene = new THREE.Scene();
 
+    const isMobileInitial = window.innerWidth < 768;
     const camera = new THREE.PerspectiveCamera(
-      45,
+      isMobileInitial ? 52 : 45,
       window.innerWidth / window.innerHeight,
       0.1,
       100
     );
-    // Initial camera position centered on main flower at Y = 3.2
-    camera.position.set(0, 3.2, 5.8);
+    // Initial camera position centered on main flower
+    camera.position.set(0, isMobileInitial ? 2.6 : 3.2, isMobileInitial ? 5.2 : 5.8);
 
     // 3. Botanical World Setup
     const world = new BotanicalWorld();
@@ -135,31 +137,33 @@ export function FlowerScene() {
     currentScrollFraction = targetScrollFraction;
 
     // 6. Window Resize
+    let isMobile = isMobileInitial;
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
+      isMobile = width < 768;
       camera.aspect = width / height;
-      // Adjust FOV for narrower mobile screens so flower remains centered and grand
-      camera.fov = width < 768 ? 58 : 45;
+      camera.fov = isMobile ? 52 : 45;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
     };
     window.addEventListener("resize", handleResize);
     handleResize();
 
-    // 7. Animation Loop
+    // 7. Animation Loop with bulletproof performance.now() timing
     let animationFrameId: number;
-    const timer = new THREE.Timer();
-    timer.connect(document);
-    let currentCamY = 3.2;
-    let currentLookY = 3.2;
-    let currentCamZ = 5.8;
+    let lastTime = performance.now();
+    const startTime = performance.now();
+    let currentCamY = isMobile ? 2.6 : 3.2;
+    let currentLookY = isMobile ? 2.6 : 3.2;
+    let currentCamZ = isMobile ? 5.2 : 5.8;
     let lastProgress = 0.0;
 
     const animate = () => {
-      timer.update();
-      const delta = Math.min(0.1, timer.getDelta());
-      const elapsedTime = timer.getElapsed();
+      const now = performance.now();
+      const delta = Math.min(0.1, Math.max(0.001, (now - lastTime) / 1000));
+      lastTime = now;
+      const elapsedTime = (now - startTime) / 1000;
 
       // Smooth mouse lerping
       mouse.x += (mouse.targetX - mouse.x) * 0.06;
@@ -180,9 +184,11 @@ export function FlowerScene() {
       // Camera Tracking along the vertical botanical tree
       // At scroll = 0: Camera at Y = 3.2 (Hero view on main flower)
       // At scroll = 1: Camera descends to Y = -11.0 (Footer view with roots & branches)
-      const targetCamY = THREE.MathUtils.lerp(3.2, -11.0, currentScrollFraction);
-      const targetLookY = THREE.MathUtils.lerp(3.2, -12.0, currentScrollFraction);
-      const targetCamZ = THREE.MathUtils.lerp(5.8, 7.2, currentScrollFraction);
+      const baseStartCamY = isMobile ? 2.6 : 3.2;
+      const baseStartCamZ = isMobile ? 5.2 : 5.8;
+      const targetCamY = THREE.MathUtils.lerp(baseStartCamY, -11.0, currentScrollFraction);
+      const targetLookY = THREE.MathUtils.lerp(baseStartCamY, -12.0, currentScrollFraction);
+      const targetCamZ = THREE.MathUtils.lerp(baseStartCamZ, 7.2, currentScrollFraction);
 
       currentCamY = THREE.MathUtils.lerp(currentCamY, targetCamY, scrollSmooth);
       currentLookY = THREE.MathUtils.lerp(currentLookY, targetLookY, scrollSmooth);
@@ -212,7 +218,6 @@ export function FlowerScene() {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
-      timer.dispose();
       world.dispose();
       renderer.dispose();
     };
@@ -240,27 +245,27 @@ export function FlowerScene() {
 
       {/* Floating Botanical Experience HUD / Bloom Controller */}
       <div
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full border border-[#7a4458]/45 bg-[#1e0c14]/92 backdrop-blur-xl shadow-[0_0_22px_rgba(0,0,0,0.32)] text-xs text-[#ded0d5] transition-all select-none hover:border-[#a06880]/60"
+        className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2 sm:gap-3 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-[#15803d]/45 bg-[#0a1a0f]/92 backdrop-blur-xl shadow-[0_0_22px_rgba(0,0,0,0.32)] text-[11px] sm:text-xs text-[#e2f5e8] transition-all select-none hover:border-[#22c55e]/60"
         role="region"
         aria-label="Interactive Botanical Bloom Controls"
       >
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d84878] opacity-35"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#d84878]"></span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-35"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-[#22c55e]"></span>
           </span>
-          <span className="font-mono tracking-wider font-semibold text-[#e8b0c8]">
+          <span className="font-mono tracking-wider font-semibold text-[#86efac] max-w-[125px] sm:max-w-none truncate">
             {getStageName(bloomProgress)}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-white/20 mx-1" />
+        <div className="h-3 sm:h-4 w-px bg-white/20 mx-0.5 sm:mx-1" />
 
         {/* Replay Bloom Button */}
         <button
           type="button"
           onClick={handleReplay}
-          className="px-2.5 py-1 rounded-full bg-[#3a1020]/70 hover:bg-[#5a1830]/80 border border-[#a06080]/45 text-[#f1f2f4] font-medium transition-all text-[11px] flex items-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(0,0,0,0.25)]"
+          className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#15803d]/40 hover:bg-[#16a34a]/60 border border-[#22c55e]/45 text-[#f1f2f4] font-medium transition-all text-[10px] sm:text-[11px] flex items-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(0,0,0,0.25)] cursor-pointer"
           title="Replay closed-bud-to-full-bloom transformation"
         >
           <span>↺ Replay Bloom</span>
@@ -277,7 +282,7 @@ export function FlowerScene() {
             step="0.01"
             value={bloomProgress}
             onChange={(e) => handleManualBloomChange(parseFloat(e.target.value))}
-            className="w-16 h-1.5 bg-[#3a1020] rounded-lg appearance-none cursor-pointer accent-[#d84878]"
+            className="w-16 h-1.5 bg-[#0e2a16] rounded-lg appearance-none cursor-pointer accent-[#22c55e]"
             title="Drag to manually inspect any blooming phase"
           />
         </div>
