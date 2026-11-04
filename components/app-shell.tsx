@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/auth-provider";
+import { CodeBloomLogo } from "@/components/code-bloom-logo";
 import { projects } from "@/lib/demo-data";
 
 const discovery = [
@@ -29,10 +30,7 @@ const topics = [
 ];
 
 function Brand() {
-  return <Link href="/dashboard" className="brand" aria-label="CodeBloom dashboard">
-    <span className="brand-icon" aria-hidden="true"><i /><i /><i /><i /></span>
-    <span className="brand-name">code<span>bloom</span><small>DISCOVER. DISCUSS. BUILD UPON.</small></span>
-  </Link>;
+  return <CodeBloomLogo className="app-shell-cb-logo" />;
 }
 
 function Avatar({ initials = "AC", tone = "plum" }: { initials?: string; tone?: string }) {

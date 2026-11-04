@@ -41,6 +41,17 @@ export function LandingPage() {
   const [formTask, setFormTask] = useState("");
   const [formSubmitted, setFormSubmitted] = useState(false);
 
+  // Dynamic header blur when scrolled
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 30);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   useEffect(() => {
     const root = document.querySelector<HTMLElement>(".hw-root");
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -145,7 +156,7 @@ export function LandingPage() {
       {/* ============================================================ */}
       {/* 2. TOP CHROME NAVIGATION                                     */}
       {/* ============================================================ */}
-      <header className="top">
+      <header className={`top ${isScrolled ? "is-scrolled" : ""}`}>
         <CodeBloomLogo />
 
         <div className="top-actions">

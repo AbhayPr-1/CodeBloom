@@ -252,7 +252,7 @@ describe("entry and first-run journey", () => {
   it("uses the shared CodeBloom brand lockup and signup theme marker", () => {
     render(<AuthPage mode="signup" />);
     expect(screen.getByRole("main")).toHaveAttribute("data-auth-mode", "signup");
-    expect(screen.getByText("DISCOVER · DISCUSS · BUILD UPON")).toBeInTheDocument();
+    expect(screen.getByLabelText("CodeBloom home")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Create your account" })).toBeInTheDocument();
   });
 

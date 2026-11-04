@@ -152,8 +152,6 @@ export function LandingScrollStory({ onChapterChange }: { onChapterChange?: (cha
             <div className={`scroll-story-scene scene-${activeChapter + 1}`}>
               <div className="scroll-story-orbit orbit-one" />
               <div className="scroll-story-orbit orbit-two" />
-              <div className="scroll-story-float float-top"><span>✳</span> IDEAS, IN BLOOM</div>
-              <div className="scroll-story-float float-bottom"><span>01—03</span> A COMMUNITY FOR BUILDERS</div>
 
               <div className="scroll-story-window">
                 <div className="scroll-story-window-top">

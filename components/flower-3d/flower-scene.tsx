@@ -121,16 +121,18 @@ export function FlowerScene() {
     window.addEventListener("touchstart", handleTouchMove, { passive: true });
 
     // 5. Scroll State Tracking across the entire landing page
-    let scrollFraction = 0;
+    let targetScrollFraction = 0;
+    let currentScrollFraction = 0;
     const handleScroll = () => {
       const maxScroll = Math.max(
         1,
         document.documentElement.scrollHeight - window.innerHeight
       );
-      scrollFraction = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      targetScrollFraction = Math.max(0, Math.min(1, window.scrollY / maxScroll));
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
+    currentScrollFraction = targetScrollFraction;
 
     // 6. Window Resize
     const handleResize = () => {
@@ -151,6 +153,7 @@ export function FlowerScene() {
     timer.connect(document);
     let currentCamY = 3.2;
     let currentLookY = 3.2;
+    let currentCamZ = 5.8;
     let lastProgress = 0.0;
 
     const animate = () => {
@@ -162,8 +165,12 @@ export function FlowerScene() {
       mouse.x += (mouse.targetX - mouse.x) * 0.06;
       mouse.y += (mouse.targetY - mouse.y) * 0.06;
 
-      // Update botanical world kinematics and bloom
-      world.update(delta, elapsedTime, scrollFraction);
+      // Frame-rate independent exponential smoothing for fluent, butter-smooth scroll momentum
+      const scrollSmooth = 1 - Math.exp(-delta * 7.5);
+      currentScrollFraction = THREE.MathUtils.lerp(currentScrollFraction, targetScrollFraction, scrollSmooth);
+
+      // Update botanical world kinematics and bloom with smoothly interpolated scroll
+      world.update(delta, elapsedTime, currentScrollFraction);
       // Only trigger React state updates when bloom progress actually animates (eliminates 60fps re-render overhead)
       if (Math.abs(lastProgress - world.bloomProgress) > 0.04 || (world.bloomProgress < 0.99 && lastProgress !== world.bloomProgress)) {
         lastProgress = world.bloomProgress;
@@ -172,12 +179,14 @@ export function FlowerScene() {
 
       // Camera Tracking along the vertical botanical tree
       // At scroll = 0: Camera at Y = 3.2 (Hero view on main flower)
-      // At scroll = 1: Camera descends to Y = -11.5 (Footer view with roots & branches)
-      const targetCamY = THREE.MathUtils.lerp(3.2, -11.0, scrollFraction);
-      const targetLookY = THREE.MathUtils.lerp(3.2, -12.0, scrollFraction);
+      // At scroll = 1: Camera descends to Y = -11.0 (Footer view with roots & branches)
+      const targetCamY = THREE.MathUtils.lerp(3.2, -11.0, currentScrollFraction);
+      const targetLookY = THREE.MathUtils.lerp(3.2, -12.0, currentScrollFraction);
+      const targetCamZ = THREE.MathUtils.lerp(5.8, 7.2, currentScrollFraction);
 
-      currentCamY = THREE.MathUtils.lerp(currentCamY, targetCamY, 0.06);
-      currentLookY = THREE.MathUtils.lerp(currentLookY, targetLookY, 0.06);
+      currentCamY = THREE.MathUtils.lerp(currentCamY, targetCamY, scrollSmooth);
+      currentLookY = THREE.MathUtils.lerp(currentLookY, targetLookY, scrollSmooth);
+      currentCamZ = THREE.MathUtils.lerp(currentCamZ, targetCamZ, scrollSmooth);
 
       // Subtle 3D parallax on camera
       const parallaxX = mouse.x * 0.45;
@@ -185,8 +194,7 @@ export function FlowerScene() {
 
       camera.position.x = parallaxX;
       camera.position.y = currentCamY + parallaxY;
-      // Slightly back away as we descend to view wider branch span
-      camera.position.z = THREE.MathUtils.lerp(5.8, 7.2, scrollFraction);
+      camera.position.z = currentCamZ;
 
       camera.lookAt(new THREE.Vector3(parallaxX * 0.3, currentLookY, 0));
 
@@ -225,6 +233,8 @@ export function FlowerScene() {
         className="fixed inset-0 z-0 w-full h-full pointer-events-none"
         style={{
           background: "transparent",
+          willChange: "transform",
+          transform: "translateZ(0)",
         }}
       />
 

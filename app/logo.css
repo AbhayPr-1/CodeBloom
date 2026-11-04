@@ -1,0 +1,311 @@
+/* ==========================================================================
+   CODE_BLOOM ANIMATED BOTANICAL TYPOGRAPHIC LOGO
+   Shared across Landing, Login, Signup, Reset & public routes.
+   ========================================================================== */
+.cb-logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-family: "Coolvetica HC", "Arial Narrow", Impact, sans-serif;
+  font-weight: 850;
+  font-size: clamp(24px, 2.6vw, 36px);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #ffffff;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  isolation: isolate;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s ease;
+}
+
+:root[data-theme="light"] .cb-logo {
+  color: #220815;
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.7);
+}
+
+:root[data-theme="light"] .cb-logo:hover {
+  filter: drop-shadow(0 0 16px rgba(168, 48, 96, 0.25));
+}
+
+:root[data-theme="light"] .cb-logo-botanical {
+  opacity: 0.85;
+}
+
+:root[data-theme="light"] .cb-spore {
+  background: #a83060;
+  box-shadow: 0 0 6px #d84878;
+}
+
+.cb-logo:hover {
+  transform: translateY(-1px) scale(1.02);
+  filter: drop-shadow(0 0 16px rgba(216, 72, 120, 0.35));
+}
+
+/* Botanical Vine & Leaf Silhouettes behind the logo */
+.cb-logo-botanical {
+  position: absolute;
+  inset: -10px -16px -8px -16px;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.75;
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cb-logo:hover .cb-logo-botanical {
+  opacity: 0.95;
+  transform: scale(1.04);
+}
+
+.cb-vine-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.cb-stem-path {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cb-logo.is-bloomed .cb-stem-path {
+  stroke-dashoffset: 0;
+}
+
+.cb-leaf {
+  opacity: 0;
+  transform-origin: 70px 26px;
+  transform: scale(0.3) rotate(-10deg);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.cb-leaf-left {
+  transition-delay: 0.25s;
+}
+
+.cb-leaf-right {
+  transition-delay: 0.45s;
+}
+
+.cb-logo.is-bloomed .cb-leaf {
+  opacity: 0.85;
+  transform: scale(1) rotate(0deg);
+}
+
+.cb-logo:hover .cb-leaf-left {
+  animation: cb-leaf-sway-left 2.8s ease-in-out infinite alternate;
+}
+
+.cb-logo:hover .cb-leaf-right {
+  animation: cb-leaf-sway-right 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes cb-leaf-sway-left {
+  0% { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.05) rotate(-4deg); }
+}
+
+@keyframes cb-leaf-sway-right {
+  0% { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1.05) rotate(4deg); }
+}
+
+/* Foreground Typography */
+.cb-logo-type {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  white-space: nowrap;
+}
+
+.cb-part {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+/* Individual Letters */
+.cb-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(8px) scaleY(0.4);
+  transform-origin: bottom center;
+  transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1), color 0.3s ease;
+}
+
+/* CODE part: fast digital typing reveal */
+.cb-logo.is-bloomed .cb-part-code .cb-letter {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+  transition-delay: calc(var(--i) * 35ms + 50ms);
+}
+
+/* BLOOM part: staggered floral petal unfurl */
+.cb-logo.is-bloomed .cb-part-bloom .cb-letter {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+  transition-delay: calc(var(--i) * 50ms + 120ms);
+}
+
+/* Metallic Paint Glint Shimmer across the letters on hover & on bloom */
+.cb-logo-type {
+  background: linear-gradient(
+    115deg,
+    #ffffff 0%,
+    #ffffff 38%,
+    #f7c4d8 48%,
+    #e888af 53%,
+    #ffffff 62%,
+    #ffffff 100%
+  );
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: background-position 0.8s ease;
+}
+
+:root[data-theme="light"] .cb-logo-type {
+  background: linear-gradient(
+    115deg,
+    #2a0e1a 0%,
+    #2a0e1a 38%,
+    #d84878 48%,
+    #a83060 53%,
+    #2a0e1a 62%,
+    #2a0e1a 100%
+  );
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.cb-logo.is-bloomed .cb-logo-type {
+  animation: cb-metallic-shimmer 1.4s 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.cb-logo:hover .cb-logo-type {
+  background-position: 0% 0;
+}
+
+@keyframes cb-metallic-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
+}
+
+/* The Baseline Underscore Cursor */
+.cb-cursor-wrap {
+  display: inline-flex;
+  align-items: flex-end;
+  padding: 0 clamp(2px, 0.12em, 5px);
+  height: 1em;
+  vertical-align: baseline;
+}
+
+.cb-cursor {
+  display: inline-block;
+  width: clamp(14px, 0.52em, 22px);
+  height: clamp(3px, 0.11em, 5px);
+  background: #ffffff;
+  border-radius: 1px;
+  margin-bottom: clamp(1px, 0.05em, 3px);
+  box-shadow: 0 0 10px rgba(232, 160, 188, 0.8), 0 0 2px #ffffff;
+  animation: cb-cursor-blink 1.2s infinite ease-in-out;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+:root[data-theme="light"] .cb-cursor {
+  background: #a83060;
+  box-shadow: 0 0 10px rgba(168, 48, 96, 0.6), 0 0 2px #a83060;
+}
+
+.cb-logo:hover .cb-cursor {
+  background: #f7c4d8;
+  box-shadow: 0 0 18px rgba(216, 72, 120, 0.95), 0 0 4px #ffffff;
+}
+
+@keyframes cb-cursor-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scaleY(0.85);
+  }
+}
+
+/* Botanical Spores / Sparkles rising from cursor */
+.cb-spores {
+  position: absolute;
+  left: 45%;
+  bottom: 4px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.cb-spore {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #f7c4d8;
+  box-shadow: 0 0 6px #e0689a;
+  opacity: 0;
+}
+
+.cb-spore-1 {
+  left: -4px;
+  animation: cb-spore-rise 3.2s 0.8s infinite ease-out;
+}
+
+.cb-spore-2 {
+  left: 6px;
+  animation: cb-spore-rise 3.6s 1.6s infinite ease-out;
+}
+
+.cb-spore-3 {
+  left: 2px;
+  animation: cb-spore-rise 2.9s 2.4s infinite ease-out;
+}
+
+@keyframes cb-spore-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  30% {
+    opacity: 0.85;
+    transform: translate(calc(sin(0.5) * 6px), -12px) scale(1);
+  }
+  70% {
+    opacity: 0.65;
+    transform: translate(-5px, -24px) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(4px, -36px) scale(0.2);
+  }
+}
+
+/* Hover Petal Bloom Expansion */
+.cb-logo:hover .cb-part-bloom .cb-letter {
+  transform: translateY(-1.5px) scale(1.03);
+}
+
+.cb-logo:hover .cb-part-code .cb-letter {
+  transform: translateY(-0.5px);
+}
+
