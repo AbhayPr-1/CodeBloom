@@ -1,42 +1,53 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { BotanicalWorld } from "./flower-botanical-system";
+import { AsciiPostProcessor } from "./flower-ascii-pass";
 import { useTheme } from "@/components/theme-provider";
 
 export function FlowerScene() {
   const { theme } = useTheme();
+  const themeRef = useRef(theme);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<BotanicalWorld | null>(null);
+  const asciiPassRef = useRef<AsciiPostProcessor | null>(null);
   const [bloomProgress, setBloomProgress] = useState(0.0);
-  const [isInteractiveManual, setIsInteractiveManual] = useState(false);
+  const [renderMode, setRenderMode] = useState<"ascii" | "silk">("ascii");
+  const renderModeRef = useRef<"ascii" | "silk">("ascii");
+
+  // Keep renderModeRef and themeRef in sync
+  useEffect(() => {
+    renderModeRef.current = renderMode;
+  }, [renderMode]);
+
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   // Derive current blooming stage name for HUD
   const getStageName = (p: number) => {
-    if (p < 0.15) return "Stage 1: Closed Bud";
-    if (p < 0.35) return "Stage 2: Stem Growth";
-    if (p < 0.60) return "Stage 3: Budding Branches";
-    if (p < 0.88) return "Stage 4: Main Petal Bloom";
-    return "Stage 5: Full Radiant Bloom";
+    if (p < 0.15) return "Stage 1: Bud";
+    if (p < 0.35) return "Stage 2: Stem";
+    if (p < 0.60) return "Stage 3: Branches";
+    if (p < 0.88) return "Stage 4: Petals";
+    return "Stage 5: Bloom";
   };
 
-  // Synchronize 3D botanical world lighting with the active theme
+  // Synchronize 3D botanical world and ASCII shader with the active theme
   useEffect(() => {
     worldRef.current?.setTheme(theme);
+    asciiPassRef.current?.setTheme(theme);
   }, [theme]);
 
   const handleReplay = useCallback(() => {
     if (worldRef.current) {
-      setIsInteractiveManual(false);
       worldRef.current.replayBloom();
     }
   }, []);
 
   const handleManualBloomChange = useCallback((value: number) => {
     if (worldRef.current) {
-      setIsInteractiveManual(true);
       worldRef.current.bloomProgress = value;
       worldRef.current.targetBloomProgress = value;
       setBloomProgress(value);
@@ -82,9 +93,20 @@ export function FlowerScene() {
 
     // 3. Botanical World Setup
     const world = new BotanicalWorld();
-    world.setTheme(theme);
+    world.setTheme(themeRef.current);
     worldRef.current = world;
     scene.add(world.rootGroup);
+
+    // ASCII Post-Processor for matrix/code character flower rendering
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const asciiPass = new AsciiPostProcessor(
+      renderer,
+      window.innerWidth,
+      window.innerHeight,
+      dpr,
+      themeRef.current
+    );
+    asciiPassRef.current = asciiPass;
 
     // Autoplay the existing closed-bud-to-full-bloom animation on first load.
     world.replayBloom();
@@ -141,11 +163,13 @@ export function FlowerScene() {
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
+      const currentDpr = Math.min(window.devicePixelRatio || 1, 2);
       isMobile = width < 768;
       camera.aspect = width / height;
       camera.fov = isMobile ? 52 : 45;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
+      asciiPass.setSize(width, height, currentDpr);
     };
     window.addEventListener("resize", handleResize);
     handleResize();
@@ -204,7 +228,14 @@ export function FlowerScene() {
 
       camera.lookAt(new THREE.Vector3(parallaxX * 0.3, currentLookY, 0));
 
-      renderer.render(scene, camera);
+      if (renderModeRef.current === "ascii") {
+        if (world.particlesMesh) world.particlesMesh.visible = false;
+        asciiPass.render(scene, camera, elapsedTime);
+      } else {
+        if (world.particlesMesh) world.particlesMesh.visible = true;
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+      }
       animationFrameId = requestAnimationFrame(animate);
     };
 
@@ -218,6 +249,8 @@ export function FlowerScene() {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(animationFrameId);
+      asciiPass.dispose();
+      asciiPassRef.current = null;
       world.dispose();
       renderer.dispose();
     };
@@ -245,34 +278,48 @@ export function FlowerScene() {
 
       {/* Floating Botanical Experience HUD / Bloom Controller */}
       <div
-        className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2 sm:gap-3 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-[#15803d]/45 bg-[#0a1a0f]/92 backdrop-blur-xl shadow-[0_0_22px_rgba(0,0,0,0.32)] text-[11px] sm:text-xs text-[#e2f5e8] transition-all select-none hover:border-[#22c55e]/60"
+        className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-40 flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/20 bg-black/85 backdrop-blur-xl shadow-[0_0_20px_rgba(255,255,255,0.05)] text-[10px] sm:text-[11px] text-zinc-200 transition-all select-none hover:border-white/40"
         role="region"
         aria-label="Interactive Botanical Bloom Controls"
       >
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-35"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-[#22c55e]"></span>
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#38bdf8] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-[#2aa8ff] shadow-[0_0_6px_#2aa8ff]"></span>
           </span>
-          <span className="font-mono tracking-wider font-semibold text-[#86efac] max-w-[125px] sm:max-w-none truncate">
+          <span className="font-mono tracking-wide font-medium text-white whitespace-nowrap">
             {getStageName(bloomProgress)}
           </span>
         </div>
 
-        <div className="h-3 sm:h-4 w-px bg-white/20 mx-0.5 sm:mx-1" />
+        <div className="h-3 w-px bg-white/20 mx-0.5" />
 
         {/* Replay Bloom Button */}
         <button
           type="button"
           onClick={handleReplay}
-          className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#15803d]/40 hover:bg-[#16a34a]/60 border border-[#22c55e]/45 text-[#f1f2f4] font-medium transition-all text-[10px] sm:text-[11px] flex items-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(0,0,0,0.25)] cursor-pointer"
+          className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white font-medium transition-all text-[9px] sm:text-[10px] flex items-center gap-1 active:scale-95 shadow-[0_0_8px_rgba(0,0,0,0.4)] cursor-pointer whitespace-nowrap"
           title="Replay closed-bud-to-full-bloom transformation"
         >
-          <span>↺ Replay Bloom</span>
+          <span>↺ Replay</span>
+        </button>
+
+        {/* ASCII / Silk Mode Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            const nextMode = renderMode === "ascii" ? "silk" : "ascii";
+            renderModeRef.current = nextMode;
+            setRenderMode(nextMode);
+          }}
+          className="px-2 py-0.5 rounded-full bg-[#1d4ed8]/40 hover:bg-[#1d4ed8]/70 border border-[#38bdf8]/40 text-[#93c5fd] hover:text-white font-mono font-medium transition-all text-[9px] sm:text-[10px] flex items-center gap-1 active:scale-95 shadow-[0_0_8px_rgba(37,99,235,0.25)] cursor-pointer whitespace-nowrap"
+          title={renderMode === "ascii" ? "Switch to Silk 3D mode" : "Switch to ASCII Code Bloom mode"}
+        >
+          <span>{renderMode === "ascii" ? "❖ ASCII" : "✦ Silk"}</span>
         </button>
 
         {/* Interactive Scrub Slider */}
-        <div className="hidden sm:flex items-center gap-1.5 pl-1">
+        <div className="hidden xl:flex items-center gap-1 pl-0.5">
           <label htmlFor="bloom-scrubber" className="sr-only">Bloom Progress</label>
           <input
             id="bloom-scrubber"
@@ -282,7 +329,7 @@ export function FlowerScene() {
             step="0.01"
             value={bloomProgress}
             onChange={(e) => handleManualBloomChange(parseFloat(e.target.value))}
-            className="w-16 h-1.5 bg-[#0e2a16] rounded-lg appearance-none cursor-pointer accent-[#22c55e]"
+            className="w-10 sm:w-12 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#2aa8ff]"
             title="Drag to manually inspect any blooming phase"
           />
         </div>

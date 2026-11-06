@@ -88,6 +88,63 @@ export interface CreatorFollowDoc {
   createdAt: string;
 }
 
+export interface NotificationDoc {
+  _id: string;
+  id: string;
+  userId: string;
+  actorId: string;
+  actorName: string;
+  actorUsername: string;
+  type: "vote" | "comment" | "follow" | "update" | "welcome";
+  projectId?: string;
+  projectSlug?: string;
+  projectName?: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface CommunityMemberDoc {
+  _id: string;
+  userId: string;
+  communitySlug: string;
+  joinedAt: string;
+}
+
+export interface MessageDoc {
+  _id: string;
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderUsername: string;
+  senderName: string;
+  recipientId: string;
+  recipientUsername: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface ConversationDoc {
+  _id: string;
+  id: string;
+  participants: string[]; // user IDs
+  participantDetails: Array<{ id: string; username: string; displayName: string }>;
+  lastMessageSnippet: string;
+  lastMessageAt: string;
+  createdAt: string;
+}
+
+export interface UserPreferencesDoc {
+  _id: string;
+  userId: string;
+  emailOnVotes: boolean;
+  emailOnComments: boolean;
+  emailOnAnnouncements: boolean;
+  theme: "dark" | "light" | "system";
+  updatedAt: string;
+}
+
 export async function getUsersCollection(db?: Db): Promise<Collection<UserDoc>> {
   const database = db ?? (await getMongoDb());
   return database.collection<UserDoc>("users");
@@ -126,5 +183,30 @@ export async function getBookmarksCollection(db?: Db): Promise<Collection<Bookma
 export async function getCreatorFollowsCollection(db?: Db): Promise<Collection<CreatorFollowDoc>> {
   const database = db ?? (await getMongoDb());
   return database.collection<CreatorFollowDoc>("creator_follows");
+}
+
+export async function getNotificationsCollection(db?: Db): Promise<Collection<NotificationDoc>> {
+  const database = db ?? (await getMongoDb());
+  return database.collection<NotificationDoc>("notifications");
+}
+
+export async function getCommunityMembersCollection(db?: Db): Promise<Collection<CommunityMemberDoc>> {
+  const database = db ?? (await getMongoDb());
+  return database.collection<CommunityMemberDoc>("community_members");
+}
+
+export async function getMessagesCollection(db?: Db): Promise<Collection<MessageDoc>> {
+  const database = db ?? (await getMongoDb());
+  return database.collection<MessageDoc>("messages");
+}
+
+export async function getConversationsCollection(db?: Db): Promise<Collection<ConversationDoc>> {
+  const database = db ?? (await getMongoDb());
+  return database.collection<ConversationDoc>("conversations");
+}
+
+export async function getUserPreferencesCollection(db?: Db): Promise<Collection<UserPreferencesDoc>> {
+  const database = db ?? (await getMongoDb());
+  return database.collection<UserPreferencesDoc>("user_preferences");
 }
 

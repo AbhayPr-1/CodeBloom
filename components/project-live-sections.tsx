@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Check, ImagePlus, Send } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
 import type { LiveProject, LiveProjectUpdate } from "@/lib/live-feed";
 
 /* eslint-disable @next/next/no-img-element -- Signed private Storage URLs are rendered directly rather than sent through an image proxy. */
@@ -55,7 +56,7 @@ export function ProjectLiveSections({ project }: { project: LiveProject }) {
         {notice && <p className="success-banner" role="status"><Check size={15} />{notice}</p>}
         <button className="button button-primary button-small" type="submit" disabled={busy || title.trim().length < 3 || !body.trim()}>{busy ? <span className="spinner" aria-hidden="true" /> : <Send size={14} />}{busy ? "Posting…" : "Post update"}</button>
       </form>}
-      {updates.length ? <ol className="project-updates-list">{updates.map((update) => <li key={update.id}><article><header><h3>{update.title}</h3><time dateTime={update.createdAt}>{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(update.createdAt))}</time></header><p>{update.body}</p><small>By <span>{update.authorName}</span></small></article></li>)}</ol> : <p className="project-updates-empty">{isOwner ? "Share the first milestone or development note for this project." : "The project owner has not posted updates yet."}</p>}
+      {updates.length ? <ol className="project-updates-list">{updates.map((update) => <li key={update.id}><article><header><h3>{update.title}</h3><time dateTime={update.createdAt}>{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(update.createdAt))}</time></header><MarkdownRenderer content={update.body} className="update-body-markdown" /><small>By <span>{update.authorName}</span></small></article></li>)}</ol> : <p className="project-updates-empty">{isOwner ? "Share the first milestone or development note for this project." : "The project owner has not posted updates yet."}</p>}
     </section>
   </>;
 }

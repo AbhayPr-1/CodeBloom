@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
-  sound: { playClick: vi.fn(), playSuccess: vi.fn(), playStoryTransition: vi.fn(), toggle: vi.fn(() => true) },
+  sound: { playClick: vi.fn(), playSuccess: vi.fn(), playStoryTransition: vi.fn(), playThemeSwitch: vi.fn(), initAudio: vi.fn(), toggle: vi.fn(() => false) },
 }));
 
 vi.mock("next/link", async () => {
@@ -149,11 +149,12 @@ describe("entry and first-run journey", () => {
     }
   });
 
-  it("routes landing interactions through one opt-in sound toggle and delegated click feedback", () => {
+  it("routes landing interactions through one sound toggle and delegated click feedback", () => {
     render(<LandingPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Turn landing and story sounds on" }));
-    expect(mocks.sound.toggle).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Turn landing and story sounds off" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Turn landing and story sounds off" }));
+    expect(mocks.sound.toggle).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Turn landing and story sounds on" })).toHaveAttribute("aria-pressed", "false");
 
     mocks.sound.playClick.mockClear();
     fireEvent.click(screen.getByRole("link", { name: "Explore as a guest" }));
@@ -199,7 +200,6 @@ describe("entry and first-run journey", () => {
     vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
     try {
       render(<LandingPage />);
-      fireEvent.click(screen.getByRole("button", { name: "Turn landing and story sounds on" }));
       const storyObserver = observers.find((observer) => observer.observedTargets.some((target) => target.hasAttribute("data-story-step")));
       const story = screen.getByRole("region", { name: "From first spark to shared momentum." });
       if (!storyObserver) throw new Error("Story intersection observer not found");

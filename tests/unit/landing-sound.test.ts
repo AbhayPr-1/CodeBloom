@@ -2,12 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { sound } from "@/components/landing-sound";
 
 afterEach(() => {
-  sound.setEnabled(false);
+  sound.setEnabled(true);
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
 describe("landing story sound motifs", () => {
+  it("starts enabled by default", () => {
+    expect(sound.isEnabled()).toBe(true);
+  });
   it("does not schedule chapter audio while the sound toggle is off", () => {
     vi.useFakeTimers();
     const playChirp = vi.spyOn(

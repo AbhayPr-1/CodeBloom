@@ -9,7 +9,7 @@ import type { ProfileRecord, ProfileUpdate } from "@/lib/validation/profiles";
 
 type RequestState = "loading" | "ready" | "saving" | "saved" | "error";
 
-export function ProfileSettingsForm() {
+export function ProfileSettingsForm({ hideHeading = false }: { hideHeading?: boolean } = {}) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [state, setState] = useState<RequestState>("loading");
@@ -57,7 +57,7 @@ export function ProfileSettingsForm() {
   }
 
   return <section className="form-page profile-settings-page">
-    <PageHeading eyebrow="YOUR ACCOUNT" title="Developer profile" description="Choose the name, handle, and short introduction people will see on your public developer profile." action={profile ? <Link className="button button-outline" href={`/u/${encodeURIComponent(profile.username)}`}><ExternalLink size={15} /> View profile</Link> : undefined} />
+    {!hideHeading && <PageHeading eyebrow="YOUR ACCOUNT" title="Developer profile" description="Choose the name, handle, and short introduction people will see on your public developer profile." action={profile ? <Link className="button button-outline" href={`/u/${encodeURIComponent(profile.username)}`}><ExternalLink size={15} /> View profile</Link> : undefined} />}
     <div className="profile-account-note"><UserRound size={17} /><span>Signed in as <strong>{user?.email ?? "your CodeBloom account"}</strong></span></div>
     {state === "loading" && <p className="profile-form-state" role="status">Loading your profile…</p>}
     {state === "error" && <div className="error-banner" role="alert">{error} <p>If your account predates the profile trigger, review and apply the latest profile migration.</p></div>}

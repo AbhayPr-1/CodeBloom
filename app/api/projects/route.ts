@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { getProjectsCollection } from "@/lib/mongodb/collections";
 import { isMongoConfigured } from "@/lib/mongodb/client";
 import { projectInputSchema } from "@/lib/validation/projects";
+import { checkRateLimit, isOriginAllowed } from "@/lib/security";
 
 export async function GET() {
   if (!isMongoConfigured()) {
@@ -65,6 +66,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isOriginAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
   let rawInput: unknown;
   try {
     rawInput = await request.json();
@@ -77,15 +82,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please correct the project fields and use safe HTTPS links." }, { status: 400 });
   }
 
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in to publish a project." }, { status: 401 });
+  }
+
+  const rateCheck = checkRateLimit(`create-project:${user.id}`, 10, 60_000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many project submissions. Please wait a minute and try again." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
+      }
+    );
+  }
+
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "Project service is unavailable." }, { status: 503 });
   }
 
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in to publish a project." }, { status: 401 });
-    }
 
     const input = parsed.data;
     const slugBase = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";

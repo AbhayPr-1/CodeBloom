@@ -38,13 +38,13 @@ export function CodeBloomLogo({ className = "", onClick }: CodeBloomLogoProps) {
         >
           <defs>
             <linearGradient id="cb-vine-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#15803d" stopOpacity="0.6" />
-              <stop offset="50%" stopColor="#16a34a" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#86efac" stopOpacity="0.25" />
+              <stop offset="0%" stopColor="#1d4ed8" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#2aa8ff" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.95" />
             </linearGradient>
             <linearGradient id="cb-leaf-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#86efac" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#15803d" stopOpacity="0.15" />
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#1e40af" stopOpacity="0.2" />
             </linearGradient>
           </defs>
 
@@ -62,16 +62,16 @@ export function CodeBloomLogo({ className = "", onClick }: CodeBloomLogoProps) {
             <path
               d="M 71 30 C 58 28 50 16 57 10 C 66 14 70 24 71 30 Z"
               fill="url(#cb-leaf-grad)"
-              stroke="#16a34a"
+              stroke="#38bdf8"
               strokeWidth="0.8"
-              strokeOpacity="0.5"
+              strokeOpacity="0.6"
             />
             {/* Leaf veins */}
             <path
               d="M 71 30 Q 64 21 57 10 M 67 24 Q 61 22 57 24 M 64 19 Q 60 16 58 18"
-              stroke="#86efac"
+              stroke="#2aa8ff"
               strokeWidth="0.6"
-              strokeOpacity="0.4"
+              strokeOpacity="0.7"
               strokeLinecap="round"
             />
           </g>
@@ -81,16 +81,16 @@ export function CodeBloomLogo({ className = "", onClick }: CodeBloomLogoProps) {
             <path
               d="M 75 22 C 88 18 96 8 89 3 C 80 6 76 16 75 22 Z"
               fill="url(#cb-leaf-grad)"
-              stroke="#16a34a"
+              stroke="#38bdf8"
               strokeWidth="0.8"
-              strokeOpacity="0.5"
+              strokeOpacity="0.6"
             />
             {/* Leaf veins */}
             <path
               d="M 75 22 Q 81 14 89 3 M 78 17 Q 84 15 88 16 M 81 12 Q 86 9 88 11"
-              stroke="#86efac"
+              stroke="#2aa8ff"
               strokeWidth="0.6"
-              strokeOpacity="0.4"
+              strokeOpacity="0.7"
               strokeLinecap="round"
             />
           </g>

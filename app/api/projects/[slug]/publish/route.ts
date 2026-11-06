@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getProjectsCollection } from "@/lib/mongodb/collections";
 import { isMongoConfigured } from "@/lib/mongodb/client";
+import { isOriginAllowed } from "@/lib/security";
 
-export async function POST(_request: Request, context: { params: Promise<{ slug: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  if (!isOriginAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "Project publishing is not configured." }, { status: 503 });
   }

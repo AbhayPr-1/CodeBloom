@@ -8,6 +8,8 @@ import { useCommunity } from "@/components/community-provider";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
 import { ProjectArtwork } from "@/components/project-artwork";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { useRealtime } from "@/components/use-realtime";
 import type { Project } from "@/lib/demo-data";
 import type { LiveProject, LiveComment } from "@/lib/live-feed";
 import { safeHttpsUrl } from "@/lib/urls";
@@ -30,6 +32,25 @@ export function ProjectCard({ project, featured = false, liveProject }: { projec
   const saved = liveProject ? bookmarkedLive : bookmarked.includes(project.slug);
   const score = liveProject ? liveProject.score + vote - liveProject.vote : project.votes + vote;
   const demoUrl = project.demo ? safeHttpsUrl(project.demo) : null;
+
+  useRealtime(liveProject ? `project:${liveProject.id}` : null, (eventType, data: Record<string, unknown>) => {
+    if (eventType === "comment" && data?.comment && typeof data.comment === "object") {
+      const c = data.comment as Record<string, unknown>;
+      const profiles = (c.profiles && typeof c.profiles === "object") ? (c.profiles as Record<string, unknown>) : null;
+      const incoming: LiveComment = {
+        id: String(c.id || ""),
+        body: String(c.body || ""),
+        createdAt: String(c.createdAt || c.created_at || new Date().toISOString()),
+        authorName: String(c.authorName || profiles?.display_name || "Developer"),
+        authorUsername: String(c.authorUsername || profiles?.username || "developer"),
+      };
+      setComments((prev) => {
+        if (prev.some((item) => item.id === incoming.id)) return prev;
+        return [incoming, ...prev].slice(0, 5);
+      });
+      setCommentCount((count) => count + 1);
+    }
+  });
 
   async function sendAction(payload: Record<string, unknown>, action: string) {
     setBusyAction(action);
@@ -107,7 +128,7 @@ export function ProjectCard({ project, featured = false, liveProject }: { projec
       <div className="project-meta-line"><span className={`status-pill status-${project.statusTone}`}><i />{project.status}</span><span className="repo-label"><span className="repo-dot">◉</span>{project.repo}</span></div>
       <div className="project-tags" aria-label="Technologies">{project.tags.map((tag) => <span className="tag-chip" key={tag}>{tag}</span>)}</div>
       <div className="project-card-footer"><div className="engagement-actions"><div className="vote-control" aria-label={`Voting controls for ${project.name}`}><button type="button" aria-label={`Upvote ${project.name}`} aria-pressed={vote === 1} className={vote === 1 ? "vote-active" : ""} disabled={Boolean(busyAction)} onClick={() => void changeVote(1)}><ArrowUp size={15} /></button><span aria-live="polite">{score}</span><button type="button" aria-label={`Downvote ${project.name}`} aria-pressed={vote === -1} className={vote === -1 ? "vote-active vote-down-active" : ""} disabled={Boolean(busyAction)} onClick={() => void changeVote(-1)}><ArrowDown size={15} /></button></div>{liveProject ? <button className="engagement-link comment-toggle" type="button" aria-expanded={commentsOpen} onClick={() => setCommentsOpen((open) => !open)}><MessageCircle size={15} /><span>{commentCount}</span></button> : <Link className="engagement-link" href={`/projects/${project.slug}#discussion`} aria-label={`${project.comments} comments on ${project.name}`}><MessageCircle size={15} /><span>{project.comments}</span></Link>}</div><div className="card-links">{demoUrl && <a className="text-link" href={demoUrl} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${project.name} demo (opens in a new tab)`}>Live demo <ExternalLink size={13} /></a>}<button type="button" className={`icon-button bookmark-button${saved ? " is-saved" : ""}`} aria-label={saved ? `Remove ${project.name} from bookmarks` : `Bookmark ${project.name}`} aria-pressed={saved} disabled={busyAction === "bookmark"} onClick={() => void toggleSaved()}><Bookmark size={17} fill={saved ? "currentColor" : "none"} /></button></div></div>
-      {commentsOpen && liveProject && <section className="live-comments" aria-label={`Comments on ${project.name}`}><h3>Project discussion <span>{commentCount}</span></h3>{comments.length ? <ul>{comments.map((comment) => <li key={comment.id}><p>{comment.body}</p><small><Link href={`/u/${comment.authorUsername}`}>{comment.authorName}</Link> · {new Date(comment.createdAt).toLocaleDateString()}</small></li>)}</ul> : <p className="live-comments-empty">No comments yet. Start the conversation.</p>}<form onSubmit={(event) => void addComment(event)}><label className="sr-only" htmlFor={`comment-${liveProject.id}`}>Add a comment to {project.name}</label><textarea id={`comment-${liveProject.id}`} value={commentText} maxLength={2000} rows={2} placeholder="Share a thoughtful question or observation…" onChange={(event) => setCommentText(event.target.value)} /><button className="button button-primary button-small" type="submit" disabled={!commentText.trim() || busyAction === "comment"}>{busyAction === "comment" ? "Posting…" : <><Send size={13} /> Comment</>}</button></form></section>}
+      {commentsOpen && liveProject && <section className="live-comments" aria-label={`Comments on ${project.name}`}><h3>Project discussion <span>{commentCount}</span></h3>{comments.length ? <ul>{comments.map((comment) => <li key={comment.id}><MarkdownRenderer content={comment.body} className="comment-body-markdown" /><small><Link href={`/u/${comment.authorUsername}`}>{comment.authorName}</Link> · {new Date(comment.createdAt).toLocaleDateString()}</small></li>)}</ul> : <p className="live-comments-empty">No comments yet. Start the conversation.</p>}<form onSubmit={(event) => void addComment(event)}><label className="sr-only" htmlFor={`comment-${liveProject.id}`}>Add a comment to {project.name}</label><textarea id={`comment-${liveProject.id}`} value={commentText} maxLength={2000} rows={2} placeholder="Share a thoughtful question or observation…" onChange={(event) => setCommentText(event.target.value)} /><button className="button button-primary button-small" type="submit" disabled={!commentText.trim() || busyAction === "comment"}>{busyAction === "comment" ? "Posting…" : <><Send size={13} /> Comment</>}</button></form></section>}
       <span className="sr-only" aria-live="polite">{notice}</span>
       {error && <p className="social-action-error" role="alert">{error}</p>}
     </div>

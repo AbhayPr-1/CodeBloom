@@ -14,7 +14,14 @@ export interface SessionPayload {
 }
 
 function getSecretKey(): string {
-  return process.env.AUTH_SECRET || "codebloom-fallback-secret-2026-key-32chars";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret === "your-random-32-byte-base64-secret") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET must be configured with a cryptographically strong secret in production.");
+    }
+    return "codebloom-fallback-secret-2026-key-32chars";
+  }
+  return secret;
 }
 
 function base64UrlEncode(str: string): string {

@@ -3,10 +3,32 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { getProjectsCollection, getProjectUpdatesCollection } from "@/lib/mongodb/collections";
 import { isMongoConfigured } from "@/lib/mongodb/client";
 import { projectUpdateInputSchema } from "@/lib/validation/project-media";
+import { checkRateLimit, isOriginAllowed } from "@/lib/security";
+import { broadcastRealtimeEvent } from "@/lib/realtime/events";
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  if (!isOriginAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "Project updates are not configured." }, { status: 503 });
+  }
+
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in to post a project update." }, { status: 401 });
+  }
+
+  const rateCheck = checkRateLimit(`project-update:${user.id}`, 10, 60_000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many updates posted. Please wait a moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
+      }
+    );
   }
 
   let raw: unknown;
@@ -26,11 +48,6 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
 
   try {
     const { slug } = await context.params;
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in to post a project update." }, { status: 401 });
-    }
-
     const projects = await getProjectsCollection();
     const project = await projects.findOne({ slug, ownerId: user.id });
 
@@ -56,17 +73,19 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
 
     await updatesCollection.insertOne(newUpdate);
 
+    const emittedUpdate = {
+      id: updateId,
+      title: newUpdate.title,
+      body: newUpdate.body,
+      createdAt: now,
+      authorName: user.displayName || "You",
+      authorUsername: user.username || "you",
+    };
+
+    broadcastRealtimeEvent(`project:${projectId}`, "update", { update: emittedUpdate });
+
     return NextResponse.json(
-      {
-        update: {
-          id: updateId,
-          title: newUpdate.title,
-          body: newUpdate.body,
-          createdAt: now,
-          authorName: user.displayName || "You",
-          authorUsername: user.username || "you",
-        },
-      },
+      { update: emittedUpdate },
       { status: 201, headers: { "Cache-Control": "private, no-store" } }
     );
   } catch {

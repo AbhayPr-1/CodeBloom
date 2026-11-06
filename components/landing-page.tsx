@@ -1,20 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useSyncExternalStore, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/auth-provider";
 import { AuthGateDialog } from "@/components/auth-gate-dialog";
 import { AuthGlassDialog, type AuthDialogMode } from "@/components/auth-glass-dialog";
 import { ProjectArtwork } from "@/components/project-artwork";
+import dynamic from "next/dynamic";
 import { LandingDiscovery } from "@/components/landing-discovery";
 import { LandingScrollStory } from "@/components/landing-scroll-story";
 import { LandingHeroInteractive } from "@/components/landing-hero-interactive";
-import { FlowerScene } from "@/components/flower-3d/flower-scene";
 import { CodeBloomLogo } from "@/components/code-bloom-logo";
 import { projects as demoProjects, type Project } from "@/lib/demo-data";
 import { sound } from "@/components/landing-sound";
 import { tactile } from "@/components/tactile-haptics";
+
+const FlowerScene = dynamic(
+  () => import("@/components/flower-3d/flower-scene").then((mod) => mod.FlowerScene),
+  {
+    ssr: false,
+    loading: () => <div className="flower-scene-placeholder" aria-hidden="true" />,
+  }
+);
 
 const previewTopics = [...new Set(demoProjects.flatMap((project) => project.tags))];
 const storyHapticPatterns: VibratePattern[] = [[12], [9, 34, 9], [7, 22, 12, 22, 18]];
@@ -23,8 +31,21 @@ export function LandingPage() {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
 
-  // Sensory feedback is controllable and never starts audio automatically.
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  // Sound is enabled by default with interactive audio controls
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Unlock Web Audio context on user's first gesture
+  useEffect(() => {
+    const unlockAudio = () => {
+      sound.initAudio();
+    };
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
 
   // Auth modal dialog state (direct landing page glassmorphism modal)
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -36,8 +57,12 @@ export function LandingPage() {
     const params = new URLSearchParams(window.location.search);
     const authParam = params.get("auth");
     if (authParam === "login" || authParam === "signup" || authParam === "forgot") {
-      setAuthModalMode(authParam as AuthDialogMode);
-      setAuthModalOpen(true);
+      const mode = authParam as AuthDialogMode;
+      const animId = requestAnimationFrame(() => {
+        setAuthModalMode(mode);
+        setAuthModalOpen(true);
+      });
+      return () => cancelAnimationFrame(animId);
     }
   }, []);
 
@@ -61,6 +86,24 @@ export function LandingPage() {
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Fluid cursor-tracking coral spotlight across all interactive glassmorphic cards
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      const target = (e.target as HTMLElement)?.closest?.(
+        ".scroll-story-step-copy, .screen-card, .scroll-story-header, .scroll-story-stage, .scroll-story-window, .scroll-story-project-card, .works-card, .nums-stage, .num, .trail-card, .sw-formcard, .discovery-note, .hero-metric, .top, .cb-hero-btn-secondary, .btn, .scroll-story-step"
+      );
+      if (target) {
+        const rect = target.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        (target as HTMLElement).style.setProperty("--mouse-x", `${x}px`);
+        (target as HTMLElement).style.setProperty("--mouse-y", `${y}px`);
+      }
+    };
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", handlePointerMove);
   }, []);
 
   useEffect(() => {
@@ -191,6 +234,7 @@ export function LandingPage() {
             className="snd"
             type="button"
             onClick={() => {
+              sound.playThemeSwitch(theme !== "dark");
               toggleTheme();
             }}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
@@ -262,13 +306,6 @@ export function LandingPage() {
             </Link>
           </div>
         </div>
-
-        <p className="hint" id="hint">
-          <span>Scroll to look around</span>{" "}
-          <svg className="ico" aria-hidden="true">
-            <use href="#i-down" />
-          </svg>
-        </p>
       </div>
 
       {/* ============================================================ */}

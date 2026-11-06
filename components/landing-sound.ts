@@ -3,12 +3,16 @@
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
-  private enabled: boolean = false;
+  private enabled: boolean = true;
   private humOsc: OscillatorNode | null = null;
   private humGain: GainNode | null = null;
 
   constructor() {
-    // Initialized on user interaction
+    // Enabled by default; audio context unlocks on user gesture
+  }
+
+  public initAudio() {
+    this.initContext();
   }
 
   private initContext() {
@@ -52,6 +56,23 @@ class SoundEngine {
   public playClick() {
     if (!this.enabled) return;
     this.playChirp(1200, 0.03, "triangle", 0.08);
+  }
+
+  public playThemeSwitch(isDark: boolean) {
+    if (!this.enabled) return;
+    if (isDark) {
+      // Gentle deep atmospheric tone for dark mode
+      this.playChirp(659.25, 0.1, "sine", 0.07);
+      setTimeout(() => {
+        if (this.enabled) this.playChirp(440, 0.18, "sine", 0.06);
+      }, 60);
+    } else {
+      // Radiant luminous tone for light mode
+      this.playChirp(440, 0.1, "sine", 0.07);
+      setTimeout(() => {
+        if (this.enabled) this.playChirp(659.25, 0.18, "sine", 0.06);
+      }, 60);
+    }
   }
 
   public playStoryTransition(chapterIndex: number) {

@@ -3,20 +3,23 @@ import bcrypt from "bcryptjs";
 import { getUsersCollection } from "@/lib/mongodb/collections";
 import { isMongoConfigured } from "@/lib/mongodb/client";
 import { createSessionToken, setSessionCookie } from "@/lib/auth-session";
-
-function originIsAllowed(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
+import { checkRateLimit, getClientIp, isOriginAllowed } from "@/lib/security";
 
 export async function POST(request: Request) {
-  if (!originIsAllowed(request)) {
+  if (!isOriginAllowed(request)) {
     return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
+  const clientIp = getClientIp(request);
+  const rateCheck = checkRateLimit(`signup:${clientIp}`, 10, 600_000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many account registration attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
+      }
+    );
   }
 
   if (!isMongoConfigured()) {
@@ -33,12 +36,12 @@ export async function POST(request: Request) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
 
-  if (!password || password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters long." }, { status: 400 });
+  if (!password || password.length < 8 || password.length > 128) {
+    return NextResponse.json({ error: "Password must be between 8 and 128 characters long." }, { status: 400 });
   }
 
   const emailNormalized = email.toLowerCase();

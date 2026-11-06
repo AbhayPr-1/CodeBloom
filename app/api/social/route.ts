@@ -10,6 +10,8 @@ import {
   getUsersCollection,
 } from "@/lib/mongodb/collections";
 import { socialActionSchema } from "@/lib/validation/social";
+import { checkRateLimit, isOriginAllowed } from "@/lib/security";
+import { broadcastRealtimeEvent } from "@/lib/realtime/events";
 
 export async function GET(request: Request) {
   const creatorUsername = new URL(request.url).searchParams.get("creator");
@@ -50,18 +52,8 @@ export async function GET(request: Request) {
   }
 }
 
-function originIsAllowed(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: Request) {
-  if (!originIsAllowed(request)) {
+  if (!isOriginAllowed(request)) {
     return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
   }
 
@@ -72,17 +64,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Check the social action and try again." }, { status: 400 });
   }
 
-  if (!isMongoConfigured()) {
-    return NextResponse.json({ error: "The social service is unavailable." }, { status: 503 });
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in to use project social actions." }, { status: 401 });
+  }
+
+  const rateCheck = checkRateLimit(`social:${user.id}`, 60, 60_000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many social actions. Please slow down." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfterSeconds) },
+      }
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  // If in demo mode or Mongo is unavailable, simulate the social action response smoothly
+  if (!isMongoConfigured() || user.id === "demo-user-id") {
+    if (input.action === "vote") {
+      broadcastRealtimeEvent(`project:${input.projectId}`, "vote", { projectId: input.projectId, value: input.value });
+      broadcastRealtimeEvent(`project:${input.projectId}`, "vote", { projectId: input.projectId, value: input.value });
+      return NextResponse.json({ action: "vote", value: input.value });
+    }
+    if (input.action === "bookmark") {
+      return NextResponse.json({ action: "bookmark", saved: input.saved });
+    }
+    if (input.action === "follow") {
+      return NextResponse.json({ action: "follow", following: input.following });
+    }
+    if (input.action === "comment") {
+      const demoComment = {
+        id: `demo-comment-${Date.now()}`,
+        body: input.body,
+        createdAt: now,
+        authorName: user.displayName || user.username,
+        authorUsername: user.username,
+      };
+      broadcastRealtimeEvent(`project:${input.projectId}`, "comment", { projectId: input.projectId, comment: demoComment });
+      return NextResponse.json({
+        comment: demoComment,
+        commentsCount: 1,
+      });
+    }
   }
 
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in to use project social actions." }, { status: 401 });
-    }
-
-    const now = new Date().toISOString();
 
     if (input.action === "vote") {
       const votesCollection = await getProjectVotesCollection();
@@ -106,6 +135,7 @@ export async function POST(request: Request) {
           { upsert: true }
         );
       }
+      broadcastRealtimeEvent(`project:${input.projectId}`, "vote", { projectId: input.projectId, value: input.value });
       return NextResponse.json({ action: "vote", value: input.value });
     }
 
@@ -195,18 +225,22 @@ export async function POST(request: Request) {
 
     await commentsCollection.insertOne(newComment);
 
+    const emittedComment = {
+      id: commentId,
+      body: input.body,
+      created_at: now,
+      profiles: {
+        username: user.username,
+        display_name: user.displayName,
+      },
+    };
+
+    broadcastRealtimeEvent(`project:${input.projectId}`, "comment", { projectId: input.projectId, comment: emittedComment });
+
     return NextResponse.json(
       {
         action: "comment",
-        comment: {
-          id: commentId,
-          body: input.body,
-          created_at: now,
-          profiles: {
-            username: user.username,
-            display_name: user.displayName,
-          },
-        },
+        comment: emittedComment,
       },
       { status: 201 }
     );

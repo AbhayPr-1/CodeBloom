@@ -1,7 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import { AuthPage } from "@/components/auth-page";
-import { CommunityView, FeedView, ProfileView, ProjectDetail, PublishView, SimplePage } from "@/components/feed-view";
-import { ProfileSettingsForm } from "@/components/profile-settings-form";
+import { FeedView, ProfileView, ProjectDetail, PublishView, SimplePage } from "@/components/feed-view";
+import { NotificationsView } from "@/components/notifications-view";
+import { CommunitiesView } from "@/components/communities-view";
+import { MessagesView } from "@/components/messages-view";
+import { SettingsView } from "@/components/settings-view";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { safeAuthDestination } from "@/lib/auth-destination";
 import { getPublicProfileByUsername } from "@/lib/profiles";
@@ -70,20 +73,22 @@ export default async function CatchAllPage({ params, searchParams }: PageProps) 
   }
   if (section === "projects" && value && slug.length === 2) return <ProjectDetail slug={value} />;
   if (section === "u" && value && slug.length === 2) return <ProfileView handle={value} profile={await getPublicProfileByUsername(value)} />;
-  if (section === "communities" && value && slug.length === 2) return <CommunityView slug={value} />;
-  if (section === "communities" && slug.length === 1) return <SimplePage kind="communities" />;
+  if (section === "communities" && value && slug.length === 2) return <CommunitiesView slug={value} />;
+  if (section === "communities" && slug.length === 1) return <CommunitiesView />;
 
   if (section === "settings" && value === "profile" && slug.length === 2) {
     if (!(await getAuthenticatedUser())) redirect(`/login?next=${encodeURIComponent("/settings/profile")}`);
-    return <ProfileSettingsForm />;
+    return <SettingsView initialTab="profile" />;
   }
 
-  const protectedRoutes = new Set(["dashboard", "publish", "bookmarks", "notifications", "messages", "settings"]);
-  if (slug.length === 1 && protectedRoutes.has(section)) {
-    if (!(await getAuthenticatedUser())) redirect(`/login?next=${encodeURIComponent(`/${section}`)}`);
+  const appRoutes = new Set(["dashboard", "publish", "bookmarks", "notifications", "messages", "settings"]);
+  if (slug.length === 1 && appRoutes.has(section)) {
     if (section === "dashboard") return <FeedView mode="home" welcome={single(search.welcome) === "1"} authConfirmed={single(search.auth_notice) === "confirmed"} />;
     if (section === "publish") return <PublishView />;
-    return <SimplePage kind={section as "bookmarks" | "notifications" | "messages" | "settings"} />;
+    if (section === "notifications") return <NotificationsView />;
+    if (section === "messages") return <MessagesView />;
+    if (section === "settings") return <SettingsView initialTab="profile" />;
+    return <SimplePage kind={section as "bookmarks"} />;
   }
 
   notFound();

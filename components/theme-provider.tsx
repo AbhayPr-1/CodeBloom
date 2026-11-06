@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 type Theme = "dark" | "light";
 type ThemeContextValue = { theme: Theme; toggleTheme: () => void };
@@ -13,7 +20,9 @@ function readTheme(): Theme {
   try {
     const saved = window.localStorage.getItem(storageKey);
     if (saved === "dark" || saved === "light") return saved;
-  } catch { if (memoryPreference) return memoryPreference; }
+  } catch {
+    if (memoryPreference) return memoryPreference;
+  }
   if (memoryPreference) return memoryPreference;
   return "dark";
 }
@@ -30,28 +39,41 @@ function subscribe(listener: () => void) {
   };
 }
 
-function getSnapshot() { return readTheme(); }
-function getServerSnapshot(): Theme { return "dark"; }
-function announceThemeChange() { subscribers.forEach((listener) => listener()); }
+function getSnapshot() {
+  return readTheme();
+}
+function getServerSnapshot(): Theme {
+  return "dark";
+}
+function announceThemeChange() {
+  subscribers.forEach((listener) => listener());
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
-  const value = useMemo(() => ({
-    theme,
-    toggleTheme() {
-      const next: Theme = theme === "dark" ? "light" : "dark";
-      try {
-        window.localStorage.setItem(storageKey, next);
-        memoryPreference = null;
-      } catch {
-        memoryPreference = next;
-      }
-      document.documentElement.dataset.theme = next;
-      announceThemeChange();
-    },
-  }), [theme]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  const value = useMemo(
+    () => ({
+      theme,
+      toggleTheme() {
+        const next: Theme = theme === "dark" ? "light" : "dark";
+
+        try {
+          window.localStorage.setItem(storageKey, next);
+          memoryPreference = null;
+        } catch {
+          memoryPreference = next;
+        }
+        document.documentElement.dataset.theme = next;
+        announceThemeChange();
+      },
+    }),
+    [theme]
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

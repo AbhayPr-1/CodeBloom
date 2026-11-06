@@ -4,12 +4,14 @@ import { useEffect, useState, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowRight, Compass, Eye, EyeOff, LockKeyhole, Mail,
+  ArrowRight, Compass, Eye, EyeOff,
   Sprout, User, X, CheckCircle2, AlertCircle
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { authSuccessDestination, safeAuthDestination } from "@/lib/auth-destination";
+import { AuthAsciiRain } from "@/components/auth-ascii-rain";
+import { sound } from "@/components/landing-sound";
 
 export type AuthDialogMode = "login" | "signup" | "forgot";
 
@@ -31,26 +33,43 @@ export function AuthGlassDialog({
   const router = useRouter();
   const { configured, refresh } = useAuth();
   const [mode, setMode] = useState<AuthDialogMode>(initialMode);
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevInitialMode, setPrevInitialMode] = useState(initialMode);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [confirmPasswordValue, setConfirmPasswordValue] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const emailInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync mode when initialMode changes or dialog opens
-  useEffect(() => {
+  // Sync state during render when dialog opens or initialMode changes
+  if (open !== prevOpen || initialMode !== prevInitialMode) {
+    setPrevOpen(open);
+    setPrevInitialMode(initialMode);
     if (open) {
       setMode(initialMode);
       setError("");
       setMessage("");
-      // Autofocus first field when open
-      const timer = setTimeout(() => {
-        emailInputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
+      setPasswordValue("");
+      setConfirmPasswordValue("");
+      setIsPasswordFocused(false);
     }
-  }, [open, initialMode]);
+  }
+
+  const isPasswordActive =
+    isPasswordFocused || passwordValue.length > 0 || confirmPasswordValue.length > 0;
+
+  // Autofocus first field when open
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      emailInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   // Handle escape key
   useEffect(() => {
@@ -134,6 +153,28 @@ export function AuthGlassDialog({
     setError(`Direct ${provider === "github" ? "GitHub" : "Google"} single-sign-on is in preview. Please sign in or create an account with your email.`);
   }
 
+  async function handleDemoSignIn() {
+    setError("");
+    setMessage("");
+    setBusy(true);
+    const client = createSupabaseBrowserClient();
+    try {
+      const { error: authError } = await client.auth.signInWithPassword({
+        email: "demo@codebloom.dev",
+        password: "demo",
+      });
+      if (authError) throw authError;
+      await refresh();
+      onClose();
+      router.replace(authSuccessDestination(destination, "login"));
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Demo sign in failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div
       className="auth-modal-backdrop"
@@ -155,124 +196,27 @@ export function AuthGlassDialog({
           <X size={18} />
         </button>
 
-        {/* LEFT COLUMN: Visual Showcase Panel (Resembling reference image's curved illustration panel) */}
-        <div className="auth-modal-showcase">
-          <div className="auth-showcase-bg-orb" />
+        {/* LEFT COLUMN: Visual Showcase Panel with Full-Window ASCII Rain */}
+        <div className="auth-modal-showcase relative overflow-hidden">
+          <div className="auth-showcase-bg-orb pointer-events-none" />
 
-          {/* Dotted grid markers matching reference image */}
-          <div className="auth-art-dots dots-tl" aria-hidden="true">
+          {/* Seamless ASCII Rain covering the entire showcase window */}
+          <AuthAsciiRain isPasswordActive={isPasswordActive} />
+
+          {/* Ambient concentric blooming halos */}
+          <div className="auth-art-halo halo-1 pointer-events-none" />
+          <div className="auth-art-halo halo-2 pointer-events-none" />
+
+          {/* Dotted grid markers */}
+          <div className="auth-art-dots dots-tl pointer-events-none" aria-hidden="true">
             <span /><span /><span />
             <span /><span /><span />
             <span /><span /><span />
           </div>
-          <div className="auth-art-dots dots-br" aria-hidden="true">
+          <div className="auth-art-dots dots-br pointer-events-none" aria-hidden="true">
             <span /><span /><span />
             <span /><span /><span />
             <span /><span /><span />
-          </div>
-
-          {/* Botanical Sprout Artwork */}
-          <div className="auth-showcase-art">
-            {/* Ambient concentric blooming halos */}
-            <div className="auth-art-halo halo-1" />
-            <div className="auth-art-halo halo-2" />
-
-            {/* Glowing 3D-styled botanical emblem */}
-            <div className="auth-sprout-tile">
-              <svg
-                viewBox="0 0 100 100"
-                className="auth-sprout-svg"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <defs>
-                  <linearGradient id="discGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#15803d" stopOpacity="0.8" />
-                    <stop offset="50%" stopColor="#16a34a" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#052e16" stopOpacity="0.9" />
-                  </linearGradient>
-                  <linearGradient id="stemGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stopColor="#15803d" />
-                    <stop offset="50%" stopColor="#22c55e" />
-                    <stop offset="100%" stopColor="#86efac" />
-                  </linearGradient>
-                  <linearGradient id="leafLeftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#86efac" />
-                    <stop offset="40%" stopColor="#22c55e" />
-                    <stop offset="100%" stopColor="#14532d" />
-                  </linearGradient>
-                  <linearGradient id="leafRightGrad" x1="100%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#a3e635" />
-                    <stop offset="40%" stopColor="#16a34a" />
-                    <stop offset="100%" stopColor="#064e3b" />
-                  </linearGradient>
-                  <linearGradient id="budGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#dcfce7" />
-                    <stop offset="50%" stopColor="#4ade80" />
-                    <stop offset="100%" stopColor="#15803d" />
-                  </linearGradient>
-                  <filter id="budGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feMerge>
-                      <feMergeNode in="blur" />
-                      <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                {/* Ground disc / floating soil pedestal */}
-                <ellipse cx="50" cy="76" rx="28" ry="9" fill="url(#discGrad)" stroke="#4ade80" strokeWidth="1.2" strokeOpacity="0.7" />
-                <ellipse cx="50" cy="74" rx="20" ry="6" fill="#042010" fillOpacity="0.6" stroke="#86efac" strokeWidth="0.8" strokeOpacity="0.4" />
-
-                {/* Botanical main stem */}
-                <path
-                  d="M50 74 C 49 60, 52 46, 46 28"
-                  stroke="url(#stemGrad)"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-
-                {/* Left leaf (organic 3D contour) */}
-                <path
-                  d="M48 56 C 32 54, 22 42, 26 34 C 34 29, 44 40, 48 54 Z"
-                  fill="url(#leafLeftGrad)"
-                  stroke="#86efac"
-                  strokeWidth="1.2"
-                />
-                {/* Left leaf specular spine highlight */}
-                <path
-                  d="M32 38 C 38 43, 44 48, 48 54"
-                  stroke="rgba(255, 255, 255, 0.45)"
-                  strokeWidth="0.9"
-                  strokeLinecap="round"
-                />
-
-                {/* Right leaf (organic unfolding curve) */}
-                <path
-                  d="M48 46 C 62 44, 76 50, 72 60 C 66 65, 54 59, 48 48 Z"
-                  fill="url(#leafRightGrad)"
-                  stroke="#a3e635"
-                  strokeWidth="1.2"
-                />
-                {/* Right leaf specular highlight */}
-                <path
-                  d="M66 57 C 60 55, 54 52, 48 48"
-                  stroke="rgba(255, 255, 255, 0.35)"
-                  strokeWidth="0.9"
-                  strokeLinecap="round"
-                />
-
-                {/* Blooming Tip / Glowing Sprout Bud */}
-                <circle cx="45" cy="27" r="5.5" fill="url(#budGrad)" stroke="#bbf7d0" strokeWidth="1.2" filter="url(#budGlow)" />
-                <circle cx="43.5" cy="25.5" r="1.5" fill="#ffffff" fillOpacity="0.9" />
-              </svg>
-            </div>
-
-            {/* Sparkle spores and stars matching reference image */}
-            <span className="auth-art-sparkle sp-1">✦</span>
-            <span className="auth-art-sparkle sp-2">✦</span>
-            <span className="auth-art-sparkle sp-3">✦</span>
-            <span className="auth-art-sparkle sp-4">✦</span>
           </div>
         </div>
 
@@ -281,15 +225,23 @@ export function AuthGlassDialog({
           {/* Top Pill Switcher: Sign In | Sign Up (matching reference image) */}
           <div className="auth-modal-topbar">
             <div className="auth-pill-switch" role="tablist" aria-label="Sign in or Sign up">
+              <div
+                className={`auth-pill-glider ${mode === "signup" ? "is-signup" : "is-login"}`}
+                aria-hidden="true"
+              />
               <button
                 type="button"
                 role="tab"
                 aria-selected={mode === "login"}
                 className={`auth-pill-btn ${mode === "login" ? "is-active" : ""}`}
                 onClick={() => {
+                  sound.playClick();
                   setMode("login");
                   setError("");
                   setMessage("");
+                  setPasswordValue("");
+                  setConfirmPasswordValue("");
+                  setIsPasswordFocused(false);
                 }}
               >
                 Sign In
@@ -300,9 +252,13 @@ export function AuthGlassDialog({
                 aria-selected={mode === "signup"}
                 className={`auth-pill-btn ${mode === "signup" ? "is-active" : ""}`}
                 onClick={() => {
+                  sound.playClick();
                   setMode("signup");
                   setError("");
                   setMessage("");
+                  setPasswordValue("");
+                  setConfirmPasswordValue("");
+                  setIsPasswordFocused(false);
                 }}
               >
                 Sign Up
@@ -318,16 +274,16 @@ export function AuthGlassDialog({
             </div>
           )}
 
-          {/* Form Heading */}
-          <div className="auth-modal-heading">
-            <h2 id="auth-modal-title">
+          {/* Form Heading with smooth text swap */}
+          <div className="auth-modal-heading" key={`heading-${mode}`}>
+            <h2 id="auth-modal-title" className="auth-flow-text">
               {mode === "login"
                 ? "Sign In"
                 : mode === "signup"
                 ? "Create Account"
                 : "Reset Password"}
             </h2>
-            <p>
+            <p className="auth-flow-text">
               {mode === "login"
                 ? "Welcome back! Enter your details to continue."
                 : mode === "signup"
@@ -390,6 +346,14 @@ export function AuthGlassDialog({
                     minLength={8}
                     placeholder="••••••••••••"
                     disabled={busy}
+                    value={passwordValue}
+                    onChange={(e) => setPasswordValue(e.target.value)}
+                    onFocus={() => setIsPasswordFocused(true)}
+                    onBlur={(e) => {
+                      if (e.relatedTarget?.id !== "auth-confirm-password") {
+                        setIsPasswordFocused(false);
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -403,39 +367,56 @@ export function AuthGlassDialog({
               </div>
             )}
 
-            {/* Confirm Password (Sign Up Mode) */}
-            {mode === "signup" && (
-              <div className="auth-input-group">
-                <label htmlFor="auth-confirm-password">Confirm Password *</label>
-                <div className="auth-input-pill">
-                  <input
-                    id="auth-confirm-password"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    placeholder="••••••••••••"
-                    disabled={busy}
-                  />
-                  <button
-                    type="button"
-                    className="auth-input-icon auth-eye-btn"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                  >
-                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+            {/* Confirm Password (Sign Up Mode) with smooth accordion flow */}
+            <div
+              className={`auth-confirm-password-slot ${mode === "signup" ? "is-open" : ""}`}
+              aria-hidden={mode !== "signup"}
+            >
+              <div className="auth-confirm-password-inner">
+                <div className="auth-input-group">
+                  <label htmlFor="auth-confirm-password">Confirm Password *</label>
+                  <div className="auth-input-pill">
+                    <input
+                      id="auth-confirm-password"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required={mode === "signup"}
+                      minLength={8}
+                      placeholder="••••••••••••"
+                      disabled={busy || mode !== "signup"}
+                      value={confirmPasswordValue}
+                      onChange={(e) => setConfirmPasswordValue(e.target.value)}
+                      onFocus={() => setIsPasswordFocused(true)}
+                      onBlur={(e) => {
+                        if (e.relatedTarget?.id !== "auth-password") {
+                          setIsPasswordFocused(false);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="auth-input-icon auth-eye-btn"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Forgot Password Link */}
-            {mode === "login" && (
-              <div className="auth-forgot-row">
+            {/* Forgot Password Link with smooth fluid collapse */}
+            {mode !== "forgot" && (
+              <div
+                className={`auth-forgot-row ${mode === "login" ? "is-open" : "is-collapsed"}`}
+                aria-hidden={mode !== "login"}
+              >
                 <button
                   type="button"
                   className="auth-forgot-link"
+                  tabIndex={mode === "login" ? 0 : -1}
                   onClick={() => {
                     setMode("forgot");
                     setError("");
@@ -473,7 +454,7 @@ export function AuthGlassDialog({
                 <span className="auth-spinner" aria-hidden="true" />
               ) : (
                 <>
-                  <span>
+                  <span key={`btn-text-${mode}`} className="auth-flow-text">
                     {mode === "login"
                       ? "Sign In"
                       : mode === "signup"
@@ -486,13 +467,24 @@ export function AuthGlassDialog({
             </button>
           </form>
 
-          {/* Alternative Social Logins (Circular Glass Buttons like reference image) */}
+          {/* Alternative Social Logins & Demo ID */}
           <div className="auth-social-section">
             <span className="auth-social-divider">
               <span>Or connect with</span>
             </span>
 
             <div className="auth-social-row">
+              {/* Quick Demo ID Sign-in */}
+              <button
+                type="button"
+                className="auth-demo-badge-btn"
+                onClick={handleDemoSignIn}
+                disabled={busy}
+                title="1-Click Sign in with Demo ID"
+              >
+                <Sprout size={14} /> Demo ID
+              </button>
+
               {/* GitHub */}
               <button
                 type="button"

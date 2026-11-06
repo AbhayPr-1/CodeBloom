@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { AuthProvider } from "@/components/auth-provider";
 import { CommunityProvider } from "@/components/community-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AnnouncerProvider } from "@/components/live-announcer";
 import { getPublicSiteOrigin } from "@/lib/public-site";
 import "./globals.css";
 
@@ -27,5 +28,19 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <html lang="en" data-theme="dark" suppressHydrationWarning><body><ThemeProvider><AuthProvider><CommunityProvider><AppShell>{children}</AppShell></CommunityProvider></AuthProvider></ThemeProvider></body></html>;
+  return (
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <body>
+        <ThemeProvider>
+          <AuthProvider>
+            <CommunityProvider>
+              <AnnouncerProvider>
+                <AppShell>{children}</AppShell>
+              </AnnouncerProvider>
+            </CommunityProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }

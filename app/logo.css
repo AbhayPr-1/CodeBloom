@@ -29,7 +29,7 @@
 }
 
 :root[data-theme="light"] .cb-logo:hover {
-  filter: drop-shadow(0 0 16px rgba(34, 197, 94, 0.25));
+  filter: drop-shadow(0 0 16px rgba(0, 0, 0, 0.15));
 }
 
 :root[data-theme="light"] .cb-logo-botanical {
@@ -37,13 +37,13 @@
 }
 
 :root[data-theme="light"] .cb-spore {
-  background: #16a34a;
-  box-shadow: 0 0 6px #4ade80;
+  background: #2563eb;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.5);
 }
 
 .cb-logo:hover {
   transform: translateY(-1px) scale(1.02);
-  filter: drop-shadow(0 0 16px rgba(34, 197, 94, 0.35));
+  filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.35));
 }
 
 /* Botanical Vine & Leaf Silhouettes behind the logo */
@@ -162,8 +162,8 @@
     115deg,
     #ffffff 0%,
     #ffffff 38%,
-    #bbf7d0 48%,
-    #4ade80 53%,
+    #e4e4e7 48%,
+    #ffffff 53%,
     #ffffff 62%,
     #ffffff 100%
   );
@@ -178,12 +178,12 @@
 :root[data-theme="light"] .cb-logo-type {
   background: linear-gradient(
     115deg,
-    #052e16 0%,
-    #052e16 38%,
-    #16a34a 48%,
-    #15803d 53%,
-    #052e16 62%,
-    #052e16 100%
+    #09090b 0%,
+    #09090b 38%,
+    #27272a 48%,
+    #09090b 53%,
+    #09090b 62%,
+    #09090b 100%
   );
   background-size: 260% 100%;
   background-position: 100% 0;
@@ -218,22 +218,22 @@
   display: inline-block;
   width: clamp(14px, 0.52em, 22px);
   height: clamp(3px, 0.11em, 5px);
-  background: #ffffff;
+  background: #2aa8ff;
   border-radius: 1px;
   margin-bottom: clamp(1px, 0.05em, 3px);
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8), 0 0 2px #ffffff;
+  box-shadow: 0 0 10px rgba(42, 168, 255, 0.9), 0 0 3px #38bdf8;
   animation: cb-cursor-blink 1.2s infinite ease-in-out;
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 :root[data-theme="light"] .cb-cursor {
-  background: #15803d;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.6), 0 0 2px #15803d;
+  background: #2563eb;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.4), 0 0 2px #2563eb;
 }
 
 .cb-logo:hover .cb-cursor {
-  background: #86efac;
-  box-shadow: 0 0 18px rgba(34, 197, 94, 0.95), 0 0 4px #ffffff;
+  background: #38bdf8;
+  box-shadow: 0 0 18px rgba(42, 168, 255, 0.95), 0 0 4px #ffffff;
 }
 
 @keyframes cb-cursor-blink {
@@ -261,8 +261,8 @@
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: #86efac;
-  box-shadow: 0 0 6px #22c55e;
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(42, 168, 255, 0.8);
   opacity: 0;
 }
 

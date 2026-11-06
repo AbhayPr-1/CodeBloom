@@ -2,37 +2,42 @@ import * as THREE from "three";
 
 /**
  * Custom GLSL Shader for the Fractal Petals:
- * Creates translucent sage petals with focused spring-green rim lighting.
+ * Soothing, toned-down Electric/Sapphire Blue with fine pearlescent micro-sparkle texture
+ * matching the user's liquid glitter swirl reference.
+ * Calibrated to be calm, velvety, and soothing in both dark and light modes.
  */
 export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: number = 6): THREE.ShaderMaterial {
-  // Keep petal faces subdued; reserve brighter crimsons/rose-golds for the rim and core.
   const tierRatio = tierIndex / Math.max(1, totalTiers - 1);
 
+  // Soothing, toned-down Sapphire / Cerulean palette
+  // Base: deep, calm midnight sapphire shadows
   const baseColors = [
-    new THREE.Color("#0c2314"), // tier 0 — deep forest shadow
-    new THREE.Color("#091d10"),
-    new THREE.Color("#07170d"),
-    new THREE.Color("#06130a"),
-    new THREE.Color("#040e07"),
-    new THREE.Color("#020804"), // tier 5 — obsidian emerald shadow
+    new THREE.Color("#08142b"), // tier 0 — deep velvety midnight sapphire
+    new THREE.Color("#0b1a37"),
+    new THREE.Color("#0e2144"),
+    new THREE.Color("#122852"),
+    new THREE.Color("#173062"),
+    new THREE.Color("#1d3a73"), // tier 5 — rich soothing cobalt base
   ];
 
+  // Mid: calming, silky cerulean/sapphire petal body (soothing to the eyes)
   const midColors = [
-    new THREE.Color("#16a34a"), // inner: rich emerald botanical green
-    new THREE.Color("#15803d"),
-    new THREE.Color("#10b981"),
-    new THREE.Color("#059669"),
-    new THREE.Color("#047857"),
-    new THREE.Color("#065f46"), // outer: deep emerald
+    new THREE.Color("#193a73"), // inner: muted royal blue
+    new THREE.Color("#1f4689"),
+    new THREE.Color("#2653a0"),
+    new THREE.Color("#3062b6"),
+    new THREE.Color("#3c72cd"),
+    new THREE.Color("#4a83e0"), // outer: soft cerulean blue
   ];
 
+  // Rims: gentle ice-azure highlights
   const rimColors = [
-    new THREE.Color("#bbf7d0"), // inner rim: mint sparkle
-    new THREE.Color("#86efac"),
-    new THREE.Color("#4ade80"),
-    new THREE.Color("#22c55e"),
-    new THREE.Color("#16a34a"),
-    new THREE.Color("#15803d"), // outer rim: vivid emerald edge
+    new THREE.Color("#1e40af"), // tier 0: sapphire rim
+    new THREE.Color("#2563eb"),
+    new THREE.Color("#3b82f6"),
+    new THREE.Color("#60a5fa"),
+    new THREE.Color("#7dd3fc"),
+    new THREE.Color("#93c5fd"), // tier 5: soft ice-blue rim
   ];
 
   const baseColor = baseColors[Math.min(tierIndex, baseColors.length - 1)];
@@ -45,12 +50,15 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
       uBaseColor: { value: baseColor },
       uMidColor: { value: midColor },
       uRimColor: { value: rimColor },
-      uCoreLightPos: { value: new THREE.Vector3(0, 0.5, 0) },
-      uLightIntensity: { value: 0.45 },
+      uCoreLightPos: { value: new THREE.Vector3(0, 3.2, 0.8) },
+      uBackLightPos: { value: new THREE.Vector3(0, 3.2, -1.8) },
+      uBackLightColor: { value: new THREE.Color("#2563eb") }, // Soft, calm sapphire backlight
+      uLightIntensity: { value: 0.70 },
       uBloomProgress: { value: 0.0 },
-      uFresnelPower: { value: 2.2 - tierRatio * 0.4 },
-      uOpacity: { value: 0.8 },
-      uSubsurfaceStrength: { value: 0.45 },
+      uFresnelPower: { value: 2.4 - tierRatio * 0.4 },
+      uOpacity: { value: 0.95 },
+      uSubsurfaceStrength: { value: 0.38 },
+      uThemeMode: { value: 0.0 },
     },
     vertexShader: `
       varying vec3 vNormal;
@@ -66,7 +74,7 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
         
         // Gentle organic micro-flutter
         vec3 pos = position;
-        float flutter = sin(uTime * 2.0 + uv.y * 6.0 + uv.x * 4.0) * 0.015 * uv.y;
+        float flutter = sin(uTime * 2.0 + uv.y * 6.0 + uv.x * 4.0) * 0.012 * uv.y;
         pos.z += flutter;
 
         vec4 worldPos = modelMatrix * vec4(pos, 1.0);
@@ -84,17 +92,58 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
       uniform vec3 uMidColor;
       uniform vec3 uRimColor;
       uniform vec3 uCoreLightPos;
+      uniform vec3 uBackLightPos;
+      uniform vec3 uBackLightColor;
       uniform float uTime;
       uniform float uLightIntensity;
       uniform float uBloomProgress;
       uniform float uFresnelPower;
       uniform float uOpacity;
       uniform float uSubsurfaceStrength;
+      uniform float uThemeMode;
 
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec3 vWorldPosition;
       varying vec2 vUv;
+
+      // Pseudo-random 2D hash for fine micro-flake glitter
+      float sparkleHash(vec2 p) {
+        vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
+      }
+
+      // Procedural micro-sparkle texture matching user's glitter swirl reference
+      float getMicroSparkle(vec2 uv, vec3 viewDir, vec3 normal, float time) {
+        vec2 grid = uv * 240.0;
+        vec2 id = floor(grid);
+        float n = sparkleHash(id);
+
+        // Isolated fine diamond/mica specks
+        if (n < 0.94) return 0.0;
+
+        // Randomized facet normal for twinkling gleams
+        vec3 randFacet = vec3(
+          sparkleHash(id + 1.3) - 0.5,
+          sparkleHash(id + 3.7) - 0.5,
+          sparkleHash(id + 6.1) - 0.5
+        );
+        vec3 flakeNormal = normalize(normal + randFacet * 0.65);
+        float flakeSpec = pow(max(0.0, dot(flakeNormal, viewDir)), 32.0);
+
+        // Gentle sinusoidal twinkle
+        float twinkle = sin(time * 2.0 + n * 6.28) * 0.35 + 0.65;
+
+        return flakeSpec * twinkle * 1.5;
+      }
+
+      // Soft mica shimmer grain across liquid paint swirls
+      float getMicaGrain(vec2 uv) {
+        vec2 grid = uv * 140.0;
+        float h = sparkleHash(floor(grid));
+        return (h - 0.5) * 0.032;
+      }
 
       void main() {
         vec3 normal = normalize(vNormal);
@@ -105,64 +154,91 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
           normal = -normal;
         }
 
-        // 1. Longitudinal & Transverse Color Gradient
-        // Base -> Mid -> Tip
-        float tipFactor = smoothstep(0.08, 0.95, vUv.y);
+        // 1. Soothing Blue Curvature Shading (soft, calm, silky)
+        float tipFactor = smoothstep(0.04, 0.96, vUv.y);
         vec3 surfaceColor = mix(uBaseColor, uMidColor, tipFactor);
 
-        // Edge luminous accent and glowing neon rim stroke
-        float edgeDist = abs(vUv.x - 0.5) * 2.0; // 0 at center rib, 1 at petal edges
-        float edgeLuminance = smoothstep(0.72, 0.97, edgeDist);
-        surfaceColor = mix(surfaceColor, uRimColor, edgeLuminance * 0.55);
+        // Soft curvature depth along petal rib
+        float edgeDist = abs(vUv.x - 0.5) * 2.0; // 0 at center, 1 at edges
+        surfaceColor = mix(surfaceColor, uBaseColor * 0.88, (1.0 - edgeDist) * 0.25);
 
-        // Crisp luminous rim outline (matching fractal reference images)
-        float rimStroke = smoothstep(0.92, 0.998, edgeDist) * smoothstep(0.1, 0.9, vUv.y);
-        vec3 neonEdge = uRimColor * rimStroke * 1.0;
+        // Subtle mica swirl texture
+        float mica = getMicaGrain(vUv);
+        surfaceColor += vec3(mica * 0.6, mica * 0.9, mica * 1.3);
 
-        // 2. Fresnel Rim Lighting (Crystal / Glassy translucency)
+        // 2. SOFT BLUE RIM & BACKLIGHT (Toned down, soothing)
+        vec3 backLightDir = normalize(uBackLightPos - vWorldPosition);
+        
+        // Smooth Fresnel rim outlining the petals in soft blue light
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, uFresnelPower);
         
-        // Iridescent color shift on extreme rim — emerald to pale mint shimmer
-        vec3 iridescence = mix(uRimColor, vec3(0.85, 1.0, 0.90), sin(uTime + vUv.y * 4.0) * 0.22 + 0.22);
-        vec3 rimGlow = iridescence * fresnel * 0.65;
+        // Gentle backlight transmission along thin petal edges
+        float backScatter = max(0.0, dot(viewDir, backLightDir)) * uSubsurfaceStrength * smoothstep(0.38, 0.98, edgeDist);
+        vec3 backlightGlow = uBackLightColor * backScatter * 0.78;
 
-        // 3. Subsurface Scattering from glowing flower center
-        vec3 lightDir = normalize(uCoreLightPos - vWorldPosition);
-        float sss = max(0.0, dot(viewDir, -lightDir)) * uSubsurfaceStrength * (1.0 - edgeDist * 0.25);
-        vec3 sssColor = uMidColor * sss * 0.55;
+        // Clean subtle electric blue bevel groove outline
+        float rimStroke = smoothstep(0.86, 0.995, edgeDist) * smoothstep(0.05, 0.96, vUv.y);
+        vec3 blueRim = uRimColor * rimStroke * 0.70;
 
-        // 4. Specular glint & Metallic sparkle / glitter flake effect
-        vec3 halfVec = normalize(lightDir + viewDir);
-        float spec = pow(max(0.0, dot(normal, halfVec)), 28.0) * 0.45;
+        // Soft ice-blue Fresnel edge reflection
+        vec3 rimFresnel = uRimColor * fresnel * 0.52;
 
-        // Procedural metallic glitter/sparkle flakes based on micro-noise
-        vec2 flakeUv = vUv * 85.0;
-        float flakeHash = fract(sin(dot(floor(flakeUv), vec2(127.1, 311.7))) * 43758.5453123);
-        vec2 flakeFract = fract(flakeUv) - 0.5;
-        float flakeDot = clamp(1.0 - length(flakeFract) * 2.5, 0.0, 1.0);
+        // 3. Satin Specular Sheen (soft, pleasing to the eyes)
+        vec3 frontLightDir = normalize(uCoreLightPos - vWorldPosition);
+        vec3 halfVec = normalize(frontLightDir + viewDir);
+        float bodySpec = pow(max(0.0, dot(normal, halfVec)), 28.0) * 0.35;
+        vec3 electricSheen = mix(vec3(0.85, 0.92, 1.0), uRimColor, 0.35) * bodySpec;
+
+        // 4. PEARLESCENT MICRO-SPARKLE TEXTURE (Matching user reference image)
+        // "Just a little bit of sparkle around the petals"
+        float sparkle = getMicroSparkle(vUv, viewDir, normal, uTime);
+        float sparkleMask = smoothstep(0.06, 0.92, vUv.y) * (0.55 + 0.45 * edgeDist);
+        vec3 diamondSparkle = mix(vec3(0.65, 0.85, 1.0), vec3(1.0), 0.75) * sparkle * sparkleMask;
+
+        // 5. Balanced composition: soothing sapphire body with soft sparkling highlights
+        vec3 diffuse = surfaceColor * uLightIntensity;
+        vec3 ambient = surfaceColor * 0.30;
+
+        vec3 combined = diffuse + ambient + rimFresnel + blueRim + backlightGlow + electricSheen + diamondSparkle;
+
+        // In Light Mode:
+        // Luminous mild electric sky-blue petal interior with crisp midnight-navy ink outlines
+        // matching the user's reference blueprint where each petal is distinct and easily distinguishable
+        if (uThemeMode > 0.5) {
+          // Petal perimeter margins and tip
+          float lateralStroke = smoothstep(0.70, 0.985, edgeDist);
+          float tipStroke = smoothstep(0.86, 0.998, vUv.y);
+          // Silhouette glancing edge contour
+          float silhouette = pow(1.0 - NdotV, 1.8);
+          // Base fold crease
+          float baseStroke = (1.0 - smoothstep(0.0, 0.15, vUv.y)) * 0.85;
+          // Center ridge fold
+          float centerSpine = (1.0 - smoothstep(0.0, 0.04, abs(vUv.x - 0.5))) * 0.35;
+
+          float inkOutline = clamp(max(lateralStroke, max(tipStroke, silhouette * 0.95)), 0.0, 1.0);
+          inkOutline = max(inkOutline, max(baseStroke, centerSpine));
+
+          // Mild electric sky-blue petal body with luminous highlights
+          vec3 baseShadow = vec3(0.12, 0.32, 0.75); // rich sapphire crease
+          vec3 midBody    = vec3(0.35, 0.62, 0.94); // mild electric blue
+          vec3 tipGlow    = vec3(0.60, 0.82, 0.98); // ice-azure tip
+
+          vec3 lightBody = mix(baseShadow, midBody, smoothstep(0.05, 0.50, vUv.y));
+          lightBody = mix(lightBody, tipGlow, smoothstep(0.50, 0.98, vUv.y));
+
+          // Soft satin sheen & subtle mica twinkle
+          lightBody += electricSheen * 0.40 + diamondSparkle * 0.30;
+
+          // Crisp deep royal midnight-navy outline (lum ~0.08)
+          vec3 inkOutlineColor = vec3(0.02, 0.06, 0.20);
+          combined = mix(lightBody, inkOutlineColor, inkOutline);
+        }
         
-        // Random normal perturbation for metallic flake orientation
-        vec3 flakeNormal = normalize(normal + vec3(
-          (fract(flakeHash * 23.1) - 0.5) * 0.65,
-          (fract(flakeHash * 47.3) - 0.5) * 0.65,
-          (fract(flakeHash * 89.7) - 0.5) * 0.4
-        ));
-        float flakeSpec = pow(max(0.0, dot(flakeNormal, halfVec)), 42.0);
-        float sparkleGlint = step(0.68, flakeHash) * flakeDot * flakeSpec * (0.8 + 0.4 * sin(uTime * 4.0 + flakeHash * 6.28));
-        vec3 metallicSparkle = mix(uRimColor, vec3(0.88, 1.0, 0.92), 0.7) * sparkleGlint * 2.2;
+        // Smooth highlight rolloff to avoid harsh glare
+        vec3 finalColor = clamp(combined, 0.0, 0.96);
 
-        // Metallic reflection sheen
-        vec3 metallicSheen = mix(uMidColor, uRimColor, 0.5) * pow(max(0.0, dot(normal, halfVec)), 8.0) * 0.35;
-
-        // Combine lighting with metallic texture & glints
-        vec3 finalColor = (surfaceColor + sssColor) * uLightIntensity + rimGlow + neonEdge + vec3(spec) + metallicSheen + metallicSparkle;
-
-        // Bloom radiance boost
-        finalColor += uRimColor * (0.012 + 0.008 * sin(uTime * 3.0));
-
-        // Alpha calculation: translucent body with brighter glowing rims
-        float alpha = uOpacity * (0.75 + 0.25 * fresnel);
+        float alpha = uOpacity * (0.88 + 0.12 * fresnel);
 
         gl_FragColor = vec4(finalColor, alpha);
       }
@@ -175,7 +251,7 @@ export function createPetalShaderMaterial(tierIndex: number = 0, totalTiers: num
 }
 
 /**
- * Dark metallic / lacquered bark material with soft jade specular highlights and energy pulses
+ * Dark liquid titanium / polished chrome bark material with subtle sapphire blue starlight pulses
  */
 export function createBarkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -211,25 +287,25 @@ export function createBarkMaterial(): THREE.ShaderMaterial {
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
 
-        // Deep lacquered dark bark base — dark forest with obsidian green undertone
-        vec3 darkBark = vec3(0.04, 0.10, 0.06);
+        // Deep sapphire-cobalt bark base
+        vec3 darkBark = vec3(0.08, 0.15, 0.30);
         
-        // Emerald specular sheen
+        // Soft electric satin specular sheen
         vec3 lightDir = normalize(uLightPos - vWorldPosition);
         vec3 halfVec = normalize(lightDir + viewDir);
-        float spec = pow(max(0.0, dot(normal, halfVec)), 20.0);
-        vec3 jadeHighlight = vec3(0.24, 0.85, 0.45) * spec * 0.7;
+        float spec = pow(max(0.0, dot(normal, halfVec)), 26.0);
+        vec3 platinumHighlight = vec3(0.75, 0.88, 1.0) * spec * 0.50;
 
-        // Glowing emerald vein energy wave descending through the stem
+        // Mild electric blue energy pulse travelling down the stem
         float energyPulse = sin(vUv.x * 20.0 - uTime * 2.5) * 0.5 + 0.5;
-        float energyWave = pow(energyPulse, 6.0);
-        vec3 pulseColor = vec3(0.22, 0.95, 0.45) * energyWave * 0.85;
+        float energyWave = pow(energyPulse, 5.0);
+        vec3 pulseColor = vec3(0.22, 0.62, 1.0) * energyWave * 0.45;
 
-        // Rim fresnel on branch contours — metallic emerald
-        float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.6);
-        vec3 rim = vec3(0.46, 0.96, 0.62) * fresnel * 0.85;
+        // Soft electric blue rim fresnel outlining tubular contours
+        float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.5);
+        vec3 rim = vec3(0.25, 0.68, 1.0) * fresnel * 0.55;
 
-        vec3 color = darkBark + jadeHighlight + pulseColor + rim;
+        vec3 color = darkBark + platinumHighlight + pulseColor + rim;
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -238,7 +314,7 @@ export function createBarkMaterial(): THREE.ShaderMaterial {
 }
 
 /**
- * Botanical Leaf Shader Material with luminous mint veins and a soft lime rim
+ * Botanical Leaf Shader Material with dark titanium surface & delicate sapphire blue veins
  */
 export function createLeafMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -273,26 +349,26 @@ export function createLeafMaterial(): THREE.ShaderMaterial {
         if (!gl_FrontFacing) normal = -normal;
         vec3 viewDir = normalize(vViewPosition);
 
-        // Deep forest velvet base
-        vec3 leafBase = vec3(0.04, 0.12, 0.06);
+        // Mild electric blue leaf base
+        vec3 leafBase = vec3(0.10, 0.22, 0.46);
 
-        // Delicate mint-metallic veins
+        // Luminous cerulean veins
         float midrib = 1.0 - smoothstep(0.0, 0.06, abs(vUv.x - 0.5));
         float lateralVeins = sin((vUv.y - abs(vUv.x - 0.5) * 0.5) * 35.0);
-        lateralVeins = smoothstep(0.75, 1.0, lateralVeins) * 0.6;
+        lateralVeins = smoothstep(0.75, 1.0, lateralVeins) * 0.55;
 
-        vec3 veinColor = vec3(0.28, 0.88, 0.45) * (midrib * 0.9 + lateralVeins);
+        vec3 veinColor = vec3(0.24, 0.68, 1.0) * (midrib * 0.70 + lateralVeins * 0.45);
 
-        // Softly lit margin — pale mint shimmer
+        // Delicate electric blue margin glow
         float margin = smoothstep(0.78, 0.98, abs(vUv.x - 0.5) * 2.0);
-        vec3 marginGlow = vec3(0.55, 0.98, 0.68) * margin * 0.9;
+        vec3 marginGlow = vec3(0.28, 0.72, 1.0) * margin * 0.65;
 
-        // Fresnel sheen — metallic emerald
-        float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.2);
-        vec3 sheen = vec3(0.38, 0.92, 0.52) * fresnel * 0.5;
+        // Soft electric blue fresnel sheen
+        float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.3);
+        vec3 sheen = vec3(0.70, 0.85, 1.0) * fresnel * 0.45;
 
         vec3 finalColor = leafBase + veinColor + marginGlow + sheen;
-        gl_FragColor = vec4(finalColor, 0.95);
+        gl_FragColor = vec4(finalColor, 0.96);
       }
     `,
     transparent: true,
@@ -302,20 +378,20 @@ export function createLeafMaterial(): THREE.ShaderMaterial {
 }
 
 /**
- * Radiant Stamen / Pistil Core Material
+ * Radiant Stamen / Pistil Core Material: Soft Satin Platinum with Subtle Sapphire Center
  */
 export function createStamenMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: new THREE.Color("#dcfce7"),      // pale mint green
-    emissive: new THREE.Color("#15803d"),   // rich emerald radiance
+    color: new THREE.Color("#3b82f6"),      // mild electric blue
+    emissive: new THREE.Color("#2563eb"),   // mild electric sapphire core glow
     emissiveIntensity: 1.1,
     roughness: 0.22,
-    metalness: 0.72,                        // strong metallic sheen
+    metalness: 0.85,
   });
 }
 
 /**
- * Botanical spore / firefly floating particle material
+ * Botanical spore / firefly floating particle material: Gentle sapphire & starlight motes
  */
 export function createSporeParticleMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -340,12 +416,12 @@ export function createSporeParticleMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mvPosition;
 
         // Size attenuation
-        gl_PointSize = (aScale * 62.0 / -mvPosition.z) * (0.8 + 0.3 * sin(uTime * 3.0 + aPhase));
+        gl_PointSize = (aScale * 50.0 / -mvPosition.z) * (0.8 + 0.3 * sin(uTime * 3.0 + aPhase));
 
-        // Warm emerald-to-mint metallic sparkle tones
+        // Gentle sapphire blue & soft starlight motes
         float t = sin(uTime * 1.2 + aPhase) * 0.5 + 0.5;
-        vColor = mix(vec3(0.18, 0.82, 0.42), vec3(0.72, 1.0, 0.82), t);
-        vAlpha = 0.26 + 0.18 * sin(uTime * 2.0 + aPhase);
+        vColor = mix(vec3(0.16, 0.55, 0.95), vec3(0.82, 0.88, 0.96), t);
+        vAlpha = 0.26 + 0.14 * sin(uTime * 2.0 + aPhase);
       }
     `,
     fragmentShader: `
@@ -358,7 +434,7 @@ export function createSporeParticleMaterial(): THREE.ShaderMaterial {
         if (dist > 0.5) discard;
         float core = 1.0 - smoothstep(0.02, 0.18, dist);
         float halo = exp(-dist * 6.5);
-        float intensity = core * 0.8 + halo * 0.38;
+        float intensity = core * 0.78 + halo * 0.32;
 
         gl_FragColor = vec4(vColor, vAlpha * intensity);
       }
@@ -367,5 +443,54 @@ export function createSporeParticleMaterial(): THREE.ShaderMaterial {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: false,
+  });
+}
+
+/**
+ * 3D Background Illumination Corona Material:
+ * Soft, atmospheric deep cobalt/sapphire halo pleasing to the eyes
+ */
+export function createBackgroundHaloMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uGlowColor: { value: new THREE.Color("#0c152e") }, // Deep cosmic midnight blue
+      uCoreColor: { value: new THREE.Color("#1e40af") }, // Soft royal sapphire core
+      uBloomProgress: { value: 0.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec3 uGlowColor;
+      uniform vec3 uCoreColor;
+      uniform float uBloomProgress;
+      varying vec2 vUv;
+
+      void main() {
+        vec2 center = vUv - 0.5;
+        float dist = length(center) * 2.0;
+        if (dist > 1.0) discard;
+
+        // Gentle, soft radial diffusion
+        float pulse = sin(uTime * 1.4) * 0.04 + 0.96;
+        float coreFalloff = pow(clamp(1.0 - dist, 0.0, 1.0), 2.6) * pulse;
+        float softAura = pow(clamp(1.0 - dist, 0.0, 1.0), 4.0);
+
+        vec3 haloColor = mix(uGlowColor, uCoreColor, pow(clamp(1.0 - dist * 1.2, 0.0, 1.0), 1.8));
+        float alpha = (coreFalloff * 0.28 + softAura * 0.16) * (0.55 + 0.25 * uBloomProgress);
+
+        gl_FragColor = vec4(haloColor, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
   });
 }

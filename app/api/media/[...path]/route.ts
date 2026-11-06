@@ -1,32 +1,29 @@
-import { getProjectMediaCollection } from "@/lib/mongodb/collections";
-import { isMongoConfigured } from "@/lib/mongodb/client";
+import { getMediaFile } from "@/lib/storage";
+import { PROJECT_IMAGE_MIME_TYPES, type ProjectImageMime } from "@/lib/validation/project-media";
 
 export async function GET(_request: Request, context: { params: Promise<{ path: string[] }> }) {
-  if (!isMongoConfigured()) {
-    return new Response("Media service unavailable", { status: 503 });
-  }
-
   try {
     const { path } = await context.params;
     const storagePath = path.join("/");
 
-    const mediaCollection = await getProjectMediaCollection();
-    const media = await mediaCollection.findOne({ storagePath });
-
-    if (!media || !media.data) {
+    const media = await getMediaFile(storagePath);
+    if (!media || !media.buffer || media.buffer.length === 0) {
       return new Response("Media not found", { status: 404 });
     }
 
-    const base64Content = media.data.replace(/^data:[^;]+;base64,/, "");
-    const buffer = Buffer.from(base64Content, "base64");
-    const contentType = media.contentType || "image/png";
+    // Strict MIME-type enforcement against stored XSS
+    const rawType = (media.contentType || "image/png").toLowerCase();
+    const contentType = PROJECT_IMAGE_MIME_TYPES.includes(rawType as ProjectImageMime)
+      ? rawType
+      : "image/png";
 
-    return new Response(buffer, {
+    return new Response(new Uint8Array(media.buffer), {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Length": buffer.length.toString(),
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Content-Length": media.buffer.length.toString(),
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch {

@@ -81,6 +81,13 @@ class TactileHapticsEngine {
   }
 
   /**
+   * Convenience tap haptic
+   */
+  public tap() {
+    this.trigger("light");
+  }
+
+  /**
    * Attach gesture listener to prime audio on first tap/click & hook WebKit Force Touch
    */
   private attachGlobalListeners() {

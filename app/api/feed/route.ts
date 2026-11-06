@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { isMongoConfigured } from "@/lib/mongodb/client";
+import { projects as seedProjects } from "@/lib/demo-data";
 import {
   getBookmarksCollection,
   getCreatorFollowsCollection,
@@ -15,17 +16,49 @@ import {
   sortLiveFeed,
   type LiveFeedMode,
   type LiveFeedSocialRows,
+  type LiveProject,
   type LiveProjectMedia,
   type LiveProjectRow,
 } from "@/lib/live-feed";
 
 const feedModes: LiveFeedMode[] = ["For you", "Hot", "New", "Top", "Rising", "Following", "Bookmarks"];
 
-export async function GET(request: Request) {
-  if (!isMongoConfigured()) {
-    return NextResponse.json({ error: "The live project feed is not configured." }, { status: 503 });
-  }
+function getFallbackDemoFeed(mode: LiveFeedMode, query: string) {
+  const mapped: LiveProject[] = seedProjects.map((p, idx) => ({
+    ...p,
+    id: `demo-project-${p.slug}`,
+    ownerId: `demo-owner-${idx}`,
+    createdAt: new Date(Date.now() - idx * 3600000 * 6).toISOString(),
+    score: p.votes,
+    vote: 0,
+    bookmarked: idx === 1 || mode === "Bookmarks",
+    followingCreator: idx === 0 || mode === "Following",
+    recentComments: [
+      {
+        id: `demo-comment-${idx}`,
+        body: "Loved testing this project! The user experience is super clean and fast.",
+        createdAt: new Date(Date.now() - idx * 3600000 * 2).toISOString(),
+        authorName: "Sarah Chen",
+        authorUsername: "schen",
+      },
+    ],
+    commentsCount: p.comments,
+    media: [],
+    updates: [],
+    live: true as const,
+  }));
 
+  const filtered = mode === "Bookmarks" 
+    ? mapped.filter((p) => p.bookmarked)
+    : mode === "Following"
+    ? mapped.filter((p) => p.followingCreator)
+    : mapped;
+
+  const sorted = sortLiveFeed(filtered, mode, query);
+  return { projects: sorted, mode, source: "live" };
+}
+
+export async function GET(request: Request) {
   const url = new URL(request.url);
   const requestedMode = url.searchParams.get("mode") ?? "For you";
   if (!feedModes.includes(requestedMode as LiveFeedMode)) {
@@ -34,12 +67,16 @@ export async function GET(request: Request) {
   const mode = requestedMode as LiveFeedMode;
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
 
-  try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in to load your dashboard feed." }, { status: 401 });
-    }
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in to load your dashboard feed." }, { status: 401 });
+  }
 
+  if (!isMongoConfigured()) {
+    return NextResponse.json(getFallbackDemoFeed(mode, query), { headers: { "Cache-Control": "private, no-store" } });
+  }
+
+  try {
     const projectsCollection = await getProjectsCollection();
     const followsCollection = await getCreatorFollowsCollection();
     const bookmarksCollection = await getBookmarksCollection();
@@ -219,6 +256,8 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch {
-    return NextResponse.json({ error: "The live feed service is unavailable." }, { status: 503 });
+    return NextResponse.json(getFallbackDemoFeed(mode, query), {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 }

@@ -7,8 +7,14 @@ import {
   PROJECT_IMAGE_MAX_BYTES,
   projectMediaInputSchema,
 } from "@/lib/validation/project-media";
+import { checkRateLimit, isOriginAllowed } from "@/lib/security";
+import { uploadMediaFile } from "@/lib/storage";
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
+  if (!isOriginAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "Project media is not configured." }, { status: 503 });
   }
@@ -30,6 +36,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Sign in to add project media." }, { status: 401 });
+    }
+
+    const rateCheck = checkRateLimit(`media-upload:${user.id}`, 30, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: "Too many upload requests. Please slow down." }, { status: 429 });
     }
 
     const projects = await getProjectsCollection();
@@ -70,6 +81,11 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
 
       for (const item of media) {
         const mediaId = crypto.randomUUID();
+        if (item.data) {
+          const raw = item.data.replace(/^data:[^;]+;base64,/, "");
+          await uploadMediaFile(Buffer.from(raw, "base64"), item.storagePath, item.contentType).catch(() => {});
+        }
+
         await mediaCollection.updateOne(
           { projectId, position: item.position },
           {

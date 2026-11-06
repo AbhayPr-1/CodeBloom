@@ -124,30 +124,30 @@ function createTranslucentVineBarkMaterial(isLight: boolean): THREE.ShaderMateri
         float tipDist = abs(vUv.x - uGrowProgress);
         float tipGlow = smoothstep(0.09, 0.0, tipDist) * step(0.01, uGrowProgress) * step(uGrowProgress, 0.995);
 
-        // Home page bark base: deep near-black with rich botanical emerald undertone
-        vec3 darkBark = mix(vec3(0.04, 0.10, 0.06), vec3(0.08, 0.22, 0.12), uIsLight);
+        // Obsidian matte charcoal bark base
+        vec3 darkBark = mix(vec3(0.03, 0.03, 0.035), vec3(0.85, 0.85, 0.88), uIsLight);
 
-        // Home page emerald specular sheen
+        // Silver-white specular sheen
         vec3 lightDir = normalize(uLightPos - vWorldPosition);
         vec3 halfVec = normalize(lightDir + viewDir);
         float spec = pow(max(0.0, dot(normal, halfVec)), 20.0);
-        vec3 highlight = mix(vec3(0.24, 0.85, 0.45), vec3(0.18, 0.72, 0.35), uIsLight) * spec * 0.75;
+        vec3 highlight = mix(vec3(0.92, 0.94, 0.96), vec3(0.35, 0.35, 0.38), uIsLight) * spec * 0.75;
 
-        // Home page glowing emerald vein energy pulse descending through the stem
+        // Subtle white starlight energy pulse descending through the stem
         float energyPulse = sin(vUv.x * 20.0 - uTime * 2.5) * 0.5 + 0.5;
         float energyWave = pow(energyPulse, 5.0);
-        vec3 pulseColor = mix(vec3(0.22, 0.95, 0.45), vec3(0.18, 0.82, 0.38), uIsLight) * energyWave * 0.85;
+        vec3 pulseColor = mix(vec3(0.90, 0.92, 0.96), vec3(0.45, 0.45, 0.48), uIsLight) * energyWave * 0.85;
 
-        // Home page rim fresnel on branch contours — metallic emerald
+        // White rim fresnel on branch contours
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, 2.4);
-        vec3 rim = mix(vec3(0.46, 0.96, 0.62), vec3(0.38, 0.85, 0.52), uIsLight) * fresnel * 0.85;
+        vec3 rim = mix(vec3(0.95, 0.96, 1.0), vec3(0.35, 0.35, 0.38), uIsLight) * fresnel * 0.85;
 
         // Subsurface inner radiance
-        vec3 innerRadiance = mix(vec3(0.08, 0.45, 0.18), vec3(0.12, 0.55, 0.22), uIsLight) * (1.0 - NdotV * 0.5) * 0.4;
+        vec3 innerRadiance = mix(vec3(0.15, 0.15, 0.18), vec3(0.55, 0.55, 0.58), uIsLight) * (1.0 - NdotV * 0.5) * 0.4;
 
         // Tip glow bloom
-        vec3 tipColor = vec3(0.88, 1.0, 0.92) * tipGlow * 1.8;
+        vec3 tipColor = mix(vec3(1.0, 1.0, 1.0), vec3(0.2, 0.2, 0.2), uIsLight) * tipGlow * 1.8;
 
         vec3 color = darkBark + innerRadiance + highlight + pulseColor + rim + tipColor;
 
@@ -203,29 +203,29 @@ function createTranslucentVineLeafMaterial(isLight: boolean): THREE.ShaderMateri
         if (!gl_FrontFacing) normal = -normal;
         vec3 viewDir = normalize(vViewPosition);
 
-        // Home page leaf base: deep forest-velvet
-        vec3 leafBase = mix(vec3(0.04, 0.12, 0.06), vec3(0.08, 0.24, 0.12), uIsLight);
+        // Obsidian matte charcoal leaf base
+        vec3 leafBase = mix(vec3(0.035, 0.035, 0.04), vec3(0.88, 0.88, 0.90), uIsLight);
 
-        // Home page delicate mint-metallic veins
+        // Delicate silver-white veins
         float midrib = 1.0 - smoothstep(0.0, 0.06, abs(vUv.x - 0.5));
         float lateralVeins = sin((vUv.y - abs(vUv.x - 0.5) * 0.5) * 35.0);
         lateralVeins = smoothstep(0.75, 1.0, lateralVeins) * 0.6;
         
         // Pulsing vein glow
         float veinPulse = 1.0 + 0.18 * sin(uTime * 2.2 + vUv.y * 3.0);
-        vec3 veinColor = mix(vec3(0.28, 0.88, 0.48), vec3(0.20, 0.78, 0.38), uIsLight) * (midrib * 1.1 + lateralVeins * 0.9) * veinPulse;
+        vec3 veinColor = mix(vec3(0.85, 0.88, 0.92), vec3(0.25, 0.25, 0.28), uIsLight) * (midrib * 1.1 + lateralVeins * 0.9) * veinPulse;
 
-        // Home page softly lit margin — pale mint-gold shimmer
+        // Softly lit margin — white starlight rim
         float margin = smoothstep(0.78, 0.98, abs(vUv.x - 0.5) * 2.0);
-        vec3 marginGlow = mix(vec3(0.55, 0.98, 0.68), vec3(0.40, 0.85, 0.52), uIsLight) * margin * 0.9;
+        vec3 marginGlow = mix(vec3(0.95, 0.96, 1.0), vec3(0.35, 0.35, 0.38), uIsLight) * margin * 0.9;
 
-        // Home page fresnel sheen — metallic emerald
+        // Fresnel sheen — satin obsidian specular
         float NdotV = max(0.0, dot(normal, viewDir));
         float fresnel = pow(1.0 - NdotV, 2.2);
-        vec3 sheen = mix(vec3(0.38, 0.92, 0.52), vec3(0.28, 0.80, 0.42), uIsLight) * fresnel * 0.55;
+        vec3 sheen = mix(vec3(0.85, 0.88, 0.92), vec3(0.30, 0.30, 0.35), uIsLight) * fresnel * 0.55;
 
         // Subsurface scattering radiance
-        vec3 sss = mix(vec3(0.12, 0.55, 0.22), vec3(0.16, 0.62, 0.28), uIsLight) * 0.35;
+        vec3 sss = mix(vec3(0.18, 0.18, 0.22), vec3(0.60, 0.60, 0.65), uIsLight) * 0.35;
 
         vec3 finalColor = leafBase + sss + veinColor + marginGlow + sheen;
 
@@ -244,15 +244,15 @@ function createTranslucentVineLeafMaterial(isLight: boolean): THREE.ShaderMateri
 }
 
 /**
- * Glowing stamen / bud material matching home page colors
+ * Glowing stamen / bud material matching monochrome theme
  */
 function createLivelyBudMaterial(isLight: boolean): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: isLight ? new THREE.Color("#15803d") : new THREE.Color("#dcfce7"),
-    emissive: new THREE.Color("#16a34a"),
-    emissiveIntensity: isLight ? 1.0 : 1.3,
+    color: isLight ? new THREE.Color("#27272a") : new THREE.Color("#e4e4e7"),
+    emissive: isLight ? new THREE.Color("#09090b") : new THREE.Color("#ffffff"),
+    emissiveIntensity: isLight ? 0.4 : 1.25,
     roughness: 0.22,
-    metalness: 0.72,
+    metalness: 0.82,
     transparent: true,
     opacity: 0.90,
   });
@@ -284,9 +284,9 @@ function createSporeParticleMaterial(): THREE.ShaderMaterial {
 
         gl_PointSize = (aScale * 6.5) * (0.8 + 0.35 * sin(uTime * 2.6 + aPhase));
 
-        // Warm crimson-to-rose-gold tones matching home page spores
+        // Monochrome starlight silver and white motes
         float t = sin(uTime * 1.2 + aPhase) * 0.5 + 0.5;
-        vColor = mix(vec3(0.82, 0.18, 0.42), vec3(1.0, 0.72, 0.82), t);
+        vColor = mix(vec3(0.75, 0.78, 0.82), vec3(1.0, 1.0, 1.0), t);
         vAlpha = 0.36 + 0.22 * sin(uTime * 2.0 + aPhase);
       }
     `,

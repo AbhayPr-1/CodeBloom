@@ -12,6 +12,7 @@ import {
   getUsersCollection,
 } from "@/lib/mongodb/collections";
 import { mapLiveProjectRows, type LiveFeedSocialRows, type LiveProjectRow } from "@/lib/live-feed";
+import { isOriginAllowed } from "@/lib/security";
 
 export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
   if (!isMongoConfigured()) {
@@ -161,6 +162,10 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ slug: string }> }) {
+  if (!isOriginAllowed(request)) {
+    return NextResponse.json({ error: "This request origin is not allowed." }, { status: 403 });
+  }
+
   if (!isMongoConfigured()) {
     return NextResponse.json({ error: "Project cleanup is not configured." }, { status: 503 });
   }

@@ -10,6 +10,7 @@ import {
   createLeafMaterial,
   createStamenMaterial,
   createSporeParticleMaterial,
+  createBackgroundHaloMaterial,
 } from "./flower-materials";
 
 // Reusable vectors for zero-allocation hot render loop
@@ -54,6 +55,8 @@ export class BotanicalWorld {
   public stemGroup: THREE.Group;
   public particlesMesh: THREE.Points | null = null;
   public coreLight: THREE.PointLight;
+  public backLight: THREE.PointLight;
+  public backgroundHaloMesh: THREE.Mesh;
   public ambientLight: THREE.AmbientLight;
   public rimLight: THREE.DirectionalLight;
 
@@ -85,15 +88,29 @@ export class BotanicalWorld {
     // Orient flower face directly toward the screen/camera (+Z) as seen in reference images
     this.mainFlowerGroup.rotation.x = 1.44;
 
-    // Lighting setup — emerald/botanical green metallic palette
-    this.ambientLight = new THREE.AmbientLight(0x0e2a16, 0.55);
+    // 1. Radiant Background Illumination Corona (Directly behind flower at z = -0.75)
+    const haloGeom = new THREE.PlaneGeometry(9.0, 9.0);
+    const haloMat = createBackgroundHaloMaterial();
+    this.materials.push(haloMat);
+    this.backgroundHaloMesh = new THREE.Mesh(haloGeom, haloMat);
+    this.backgroundHaloMesh.position.set(0, 3.2, -0.75);
+    this.backgroundHaloMesh.renderOrder = 0;
+    this.rootGroup.add(this.backgroundHaloMesh);
+
+    // 2. Gentle Background Illumination Point Light (soft sapphire glow from behind)
+    this.backLight = new THREE.PointLight(0x1d4ed8, 2.1, 14, 1.5);
+    this.backLight.position.set(0, 3.2, -1.8);
+    this.rootGroup.add(this.backLight);
+
+    // 3. Ambient & Core Lighting (Soothing Sapphire & Soft Starlight Glow)
+    this.ambientLight = new THREE.AmbientLight(0x0e1c36, 0.50);
     this.rootGroup.add(this.ambientLight);
 
-    this.coreLight = new THREE.PointLight(0x22c55e, 2.2, 10, 1.2); // vibrant emerald glow from center
+    this.coreLight = new THREE.PointLight(0x38bdf8, 1.25, 10, 1.5); // soft starlight glow
     this.coreLight.position.set(0, 3.2, 0.9);
     this.rootGroup.add(this.coreLight);
 
-    this.rimLight = new THREE.DirectionalLight(0x16a34a, 1.3); // emerald rim accent
+    this.rimLight = new THREE.DirectionalLight(0x93c5fd, 0.70); // soothing specular rim accent
     this.rimLight.position.set(4, 8, 5);
     this.rootGroup.add(this.rimLight);
 
@@ -135,9 +152,6 @@ export class BotanicalWorld {
         14,
         0.18
       );
-
-      // Golden ratio angle distribution for organic fractal symmetry
-      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
       for (let i = 0; i < tier.count; i++) {
         const pivot = new THREE.Group();
@@ -555,7 +569,8 @@ export class BotanicalWorld {
   /**
    * Master Update Frame Loop
    */
-  public update(delta: number, elapsedTime: number, scrollProgress: number) {
+  public update(delta: number, elapsedTime: number, scrollProgress?: number) {
+    void scrollProgress;
     // Smooth bloom progression
     if (this.bloomProgress < this.targetBloomProgress) {
       this.bloomProgress = Math.min(
@@ -574,14 +589,14 @@ export class BotanicalWorld {
       if (mat.uniforms.uTime) mat.uniforms.uTime.value = elapsedTime;
       if (mat.uniforms.uBloomProgress) mat.uniforms.uBloomProgress.value = this.bloomProgress;
       if (mat.uniforms.uLightIntensity) {
-        // Intensity brightens as blooming completes
-        mat.uniforms.uLightIntensity.value = 0.7 + 0.6 * this.bloomProgress;
+        // Subtle, soothing lighting as blooming completes
+        mat.uniforms.uLightIntensity.value = 0.62 + 0.12 * this.bloomProgress;
       }
     });
 
-    // Core light pulse
-    const corePulse = Math.sin(elapsedTime * 2.8) * 0.4 + 1.0;
-    this.coreLight.intensity = (2.0 + corePulse * 1.8) * (0.3 + 0.7 * this.bloomProgress);
+    // Core light gentle pulse
+    const corePulse = Math.sin(elapsedTime * 2.0) * 0.15 + 0.85;
+    this.coreLight.intensity = (0.75 + corePulse * 0.35) * (0.4 + 0.6 * this.bloomProgress);
 
     // Smooth mouse coordinates
     this.smoothedMouse3D.lerp(this.mouse3D, 0.08);
@@ -678,15 +693,37 @@ export class BotanicalWorld {
 
   public setTheme(theme: "dark" | "light") {
     if (theme === "light") {
-      this.ambientLight.color.setHex(0xdcfce7);
+      if (this.backgroundHaloMesh) this.backgroundHaloMesh.visible = false;
+      this.ambientLight.color.setHex(0x475569);
       this.ambientLight.intensity = 0.88;
-      this.coreLight.intensity = 2.4;
-      this.rimLight.intensity = 1.35;
+      this.coreLight.color.setHex(0x1d4ed8);
+      this.coreLight.intensity = 1.35;
+      this.rimLight.intensity = 0.80;
+      this.backLight.color.setHex(0x2563eb);
+      this.backLight.intensity = 2.2;
+      this.materials.forEach((m) => {
+        if ("uniforms" in m) {
+          const sm = m as THREE.ShaderMaterial;
+          if (sm.uniforms?.uLightIntensity) sm.uniforms.uLightIntensity.value = 0.78;
+          if (sm.uniforms?.uThemeMode) sm.uniforms.uThemeMode.value = 1.0;
+        }
+      });
     } else {
-      this.ambientLight.color.setHex(0x0e2a16);
-      this.ambientLight.intensity = 0.55;
-      this.coreLight.intensity = 2.2;
-      this.rimLight.intensity = 1.3;
+      if (this.backgroundHaloMesh) this.backgroundHaloMesh.visible = true;
+      this.ambientLight.color.setHex(0x0e1c36);
+      this.ambientLight.intensity = 0.50;
+      this.coreLight.color.setHex(0x38bdf8);
+      this.coreLight.intensity = 1.25;
+      this.rimLight.intensity = 0.70;
+      this.backLight.color.setHex(0x1d4ed8);
+      this.backLight.intensity = 2.1;
+      this.materials.forEach((m) => {
+        if ("uniforms" in m) {
+          const sm = m as THREE.ShaderMaterial;
+          if (sm.uniforms?.uLightIntensity) sm.uniforms.uLightIntensity.value = 0.72;
+          if (sm.uniforms?.uThemeMode) sm.uniforms.uThemeMode.value = 0.0;
+        }
+      });
     }
   }
 
