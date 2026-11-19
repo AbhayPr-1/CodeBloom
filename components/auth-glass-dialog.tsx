@@ -120,12 +120,32 @@ export function AuthGlassDialog({
 
     try {
       if (mode === "login") {
-        const { error: authError } = await client.auth.signInWithPassword({ email, password });
-        if (authError) throw authError;
+        let authSuccess = false;
+        try {
+          const { error: authError } = await client.auth.signInWithPassword({ email, password });
+          if (!authError) authSuccess = true;
+        } catch {
+          // ignore Supabase error and try CodeBloom login API
+        }
+
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          if (res.ok) authSuccess = true;
+        } catch {
+          // ignore
+        }
+
+        if (!authSuccess) {
+          throw new Error("Invalid email or password.");
+        }
+
         await refresh();
         onClose();
-        router.replace(authSuccessDestination(destination, "login"));
-        router.refresh();
+        window.location.href = authSuccessDestination(destination, "login");
       } else if (mode === "signup") {
         const { data, error: authError } = await client.auth.signUp({ email, password });
         if (authError) throw authError;
@@ -159,15 +179,26 @@ export function AuthGlassDialog({
     setBusy(true);
     const client = createSupabaseBrowserClient();
     try {
-      const { error: authError } = await client.auth.signInWithPassword({
-        email: "demo@codebloom.dev",
-        password: "demo",
-      });
-      if (authError) throw authError;
+      try {
+        await client.auth.signInWithPassword({
+          email: "demo@codebloom.dev",
+          password: "demo",
+        });
+      } catch {
+        // ignore
+      }
+      try {
+        await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "demo@codebloom.dev", password: "demo" }),
+        });
+      } catch {
+        // ignore
+      }
       await refresh();
       onClose();
-      router.replace(authSuccessDestination(destination, "login"));
-      router.refresh();
+      window.location.href = authSuccessDestination(destination, "login");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Demo sign in failed.");
     } finally {

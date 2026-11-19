@@ -39,6 +39,10 @@
   background: #ffffff;
 }
 
+html {
+  scroll-behavior: auto !important;
+}
+
 .hw-root {
   --night: transparent;
   --night-navy: transparent;

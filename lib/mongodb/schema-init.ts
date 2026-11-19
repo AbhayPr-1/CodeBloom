@@ -45,6 +45,11 @@ export async function ensureDatabaseIndexes(database?: Db): Promise<DatabaseInde
       spec: { status: 1, visibility: 1 },
       options: { name: "idx_projects_status_visibility" },
     },
+    {
+      collection: "projects",
+      spec: { status: 1, visibility: 1, createdAt: -1 },
+      options: { name: "idx_projects_public_created" },
+    },
     // Media
     {
       collection: "project_media",

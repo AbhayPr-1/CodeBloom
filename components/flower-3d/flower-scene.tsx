@@ -6,6 +6,199 @@ import { BotanicalWorld } from "./flower-botanical-system";
 import { AsciiPostProcessor } from "./flower-ascii-pass";
 import { useTheme } from "@/components/theme-provider";
 
+interface Waypoint {
+  p: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  scale: number;
+  camY: number;
+  camZ: number;
+  lookX: number;
+  lookY: number;
+}
+
+const WAYPOINTS: Waypoint[] = [
+  // 0. Hero (scrollY: 0px, p = 0.000): Majestic, centered, bloom autoplays
+  {
+    p: 0.000,
+    posX: 0.0,
+    posY: -1.8,
+    posZ: 0.0,
+    rotX: 1.44,
+    rotY: 0.0,
+    rotZ: 0.0,
+    scale: 1.0,
+    camY: 3.2,
+    camZ: 5.8,
+    lookX: 0.0,
+    lookY: 3.2,
+  },
+  // 1. Terminal Intro (scrollY: 900px, p = 0.084): Glides smoothly to right to cradle the glass terminal
+  {
+    p: 0.084,
+    posX: 1.45,
+    posY: -1.95,
+    posZ: -0.45,
+    rotX: 1.38,
+    rotY: -0.34,
+    rotZ: 0.07,
+    scale: 0.96,
+    camY: 3.05,
+    camZ: 5.9,
+    lookX: 0.4,
+    lookY: 3.05,
+  },
+  // 2. Story Chapter 1 - Discover (scrollY: 1800px, p = 0.168): Frames right side stage window
+  {
+    p: 0.168,
+    posX: 1.7,
+    posY: -1.55,
+    posZ: 0.15,
+    rotX: 1.50,
+    rotY: -0.48,
+    rotZ: 0.12,
+    scale: 1.08,
+    camY: 3.3,
+    camZ: 5.5,
+    lookX: 0.5,
+    lookY: 3.3,
+  },
+  // 3. Story Chapter 2 - Explore (scrollY: 2800px, p = 0.260): Glides left, zooms in for macro detail!
+  {
+    p: 0.260,
+    posX: -1.45,
+    posY: -1.45,
+    posZ: 0.65,
+    rotX: 1.58,
+    rotY: 0.38,
+    rotZ: -0.08,
+    scale: 1.15,
+    camY: 3.4,
+    camZ: 5.1,
+    lookX: -0.4,
+    lookY: 3.4,
+  },
+  // 4. Story Chapter 3 - Grow (scrollY: 3700px, p = 0.350): Elevates upward, expansive blooming posture
+  {
+    p: 0.350,
+    posX: 1.15,
+    posY: -1.25,
+    posZ: -0.2,
+    rotX: 1.42,
+    rotY: -0.22,
+    rotZ: 0.04,
+    scale: 1.08,
+    camY: 3.5,
+    camZ: 5.7,
+    lookX: 0.3,
+    lookY: 3.4,
+  },
+  // 5. Inside this preview - Numbers (scrollY: 4500px, p = 0.420): Moves to left, shows full stem and leaves
+  {
+    p: 0.420,
+    posX: -1.35,
+    posY: -2.1,
+    posZ: -0.4,
+    rotX: 1.36,
+    rotY: 0.28,
+    rotZ: -0.05,
+    scale: 0.96,
+    camY: 2.85,
+    camZ: 6.0,
+    lookX: -0.35,
+    lookY: 2.85,
+  },
+  // 6. Showcase Works (scrollY: 5800px, p = 0.550): Project cards in view, glides center-right
+  {
+    p: 0.550,
+    posX: 0.8,
+    posY: -2.3,
+    posZ: -0.6,
+    rotX: 1.34,
+    rotY: -0.16,
+    rotZ: 0.03,
+    scale: 0.94,
+    camY: 2.7,
+    camZ: 6.1,
+    lookX: 0.2,
+    lookY: 2.7,
+  },
+  // 7. Footer / Contact Brief (scrollY: 8200px - 10740px, p = 0.760 - 1.000): Grounded broad glowing canopy
+  {
+    p: 0.760,
+    posX: 0.0,
+    posY: -2.45,
+    posZ: -0.85,
+    rotX: 1.30,
+    rotY: 0.0,
+    rotZ: 0.0,
+    scale: 0.90,
+    camY: 2.5,
+    camZ: 6.2,
+    lookX: 0.0,
+    lookY: 2.5,
+  },
+  {
+    p: 1.000,
+    posX: 0.0,
+    posY: -2.55,
+    posZ: -0.95,
+    rotX: 1.28,
+    rotY: 0.0,
+    rotZ: 0.0,
+    scale: 0.88,
+    camY: 2.4,
+    camZ: 6.3,
+    lookX: 0.0,
+    lookY: 2.4,
+  },
+];
+
+function sampleWaypointTrajectory(progress: number, width: number) {
+  const p = Math.max(0, Math.min(1, progress));
+
+  let i = 0;
+  while (i < WAYPOINTS.length - 2 && WAYPOINTS[i + 1].p < p) {
+    i++;
+  }
+  const w0 = WAYPOINTS[i];
+  const w1 = WAYPOINTS[i + 1];
+
+  const span = Math.max(0.0001, w1.p - w0.p);
+  const t = Math.max(0, Math.min(1, (p - w0.p) / span));
+  // Smoothstep S-curve for C1 continuity
+  const s = t * t * (3 - 2 * t);
+
+  // Responsive factors: gracefully scale down X translation on narrower mobile displays
+  const isMobile = width < 768;
+  const isTablet = width >= 768 && width < 1024;
+  const xFactor = isMobile ? 0.28 : isTablet ? 0.65 : 1.0;
+  const mobileYOffset = isMobile ? -0.45 : 0;
+  const mobileZOffset = isMobile ? -0.35 : 0;
+  const mobileScale = isMobile ? 0.78 : 1.0;
+
+  const posX = THREE.MathUtils.lerp(w0.posX, w1.posX, s) * xFactor;
+  const posY = THREE.MathUtils.lerp(w0.posY, w1.posY, s) + mobileYOffset;
+  const posZ = THREE.MathUtils.lerp(w0.posZ, w1.posZ, s) + mobileZOffset;
+
+  const rotX = THREE.MathUtils.lerp(w0.rotX, w1.rotX, s);
+  const rotY = THREE.MathUtils.lerp(w0.rotY, w1.rotY, s) * xFactor;
+  const rotZ = THREE.MathUtils.lerp(w0.rotZ, w1.rotZ, s) * xFactor;
+
+  const scale = THREE.MathUtils.lerp(w0.scale, w1.scale, s) * mobileScale;
+
+  const camY = THREE.MathUtils.lerp(w0.camY, w1.camY, s) + mobileYOffset * 0.8;
+  const camZ = THREE.MathUtils.lerp(w0.camZ, w1.camZ, s) + (isMobile ? -0.4 : 0);
+  const lookX = THREE.MathUtils.lerp(w0.lookX, w1.lookX, s) * xFactor * 0.6;
+  const lookY = THREE.MathUtils.lerp(w0.lookY, w1.lookY, s) + mobileYOffset * 0.8;
+
+  return { posX, posY, posZ, rotX, rotY, rotZ, scale, camY, camZ, lookX, lookY };
+}
+
 export function FlowerScene() {
   const { theme } = useTheme();
   const themeRef = useRef(theme);
@@ -13,6 +206,7 @@ export function FlowerScene() {
   const worldRef = useRef<BotanicalWorld | null>(null);
   const asciiPassRef = useRef<AsciiPostProcessor | null>(null);
   const [bloomProgress, setBloomProgress] = useState(0.0);
+  const lastStageRef = useRef<string>("Stage 1: Bud");
   const [renderMode, setRenderMode] = useState<"ascii" | "silk">("ascii");
   const renderModeRef = useRef<"ascii" | "silk">("ascii");
 
@@ -68,7 +262,7 @@ export function FlowerScene() {
         failIfMajorPerformanceCaveat: false,
       });
       renderer.setClearColor(0x000000, 0);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 0.92;
@@ -98,7 +292,7 @@ export function FlowerScene() {
     scene.add(world.rootGroup);
 
     // ASCII Post-Processor for matrix/code character flower rendering
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const asciiPass = new AsciiPostProcessor(
       renderer,
       window.innerWidth,
@@ -163,7 +357,7 @@ export function FlowerScene() {
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      const currentDpr = Math.min(window.devicePixelRatio || 1, 2);
+      const currentDpr = Math.min(window.devicePixelRatio || 1, 1.5);
       isMobile = width < 768;
       camera.aspect = width / height;
       camera.fov = isMobile ? 52 : 45;
@@ -178,10 +372,21 @@ export function FlowerScene() {
     let animationFrameId: number;
     let lastTime = performance.now();
     const startTime = performance.now();
-    let currentCamY = isMobile ? 2.6 : 3.2;
-    let currentLookY = isMobile ? 2.6 : 3.2;
-    let currentCamZ = isMobile ? 5.2 : 5.8;
-    let lastProgress = 0.0;
+
+    // Smoothed state variables
+    let currPosX = 0;
+    let currPosY = isMobileInitial ? -2.25 : -1.8;
+    let currPosZ = 0;
+    let currRotX = 1.44;
+    let currRotY = 0;
+    let currRotZ = 0;
+    let currScale = isMobileInitial ? 0.78 : 1.0;
+    let currCamY = isMobileInitial ? 2.7 : 3.2;
+    let currCamZ = isMobileInitial ? 5.4 : 5.8;
+    let currLookX = 0;
+    let currLookY = isMobileInitial ? 2.7 : 3.2;
+
+    const flowerWorldPos = new THREE.Vector3();
 
     const animate = () => {
       const now = performance.now();
@@ -197,39 +402,55 @@ export function FlowerScene() {
       const scrollSmooth = 1 - Math.exp(-delta * 7.5);
       currentScrollFraction = THREE.MathUtils.lerp(currentScrollFraction, targetScrollFraction, scrollSmooth);
 
+      // Sample waypoint targets for current scroll
+      const wp = sampleWaypointTrajectory(currentScrollFraction, window.innerWidth);
+
+      // Exponentially damp all position and rotation transforms
+      currPosX = THREE.MathUtils.lerp(currPosX, wp.posX, scrollSmooth);
+      currPosY = THREE.MathUtils.lerp(currPosY, wp.posY, scrollSmooth);
+      currPosZ = THREE.MathUtils.lerp(currPosZ, wp.posZ, scrollSmooth);
+      currRotX = THREE.MathUtils.lerp(currRotX, wp.rotX, scrollSmooth);
+      currRotY = THREE.MathUtils.lerp(currRotY, wp.rotY, scrollSmooth);
+      currRotZ = THREE.MathUtils.lerp(currRotZ, wp.rotZ, scrollSmooth);
+      currScale = THREE.MathUtils.lerp(currScale, wp.scale, scrollSmooth);
+      currCamY = THREE.MathUtils.lerp(currCamY, wp.camY, scrollSmooth);
+      currCamZ = THREE.MathUtils.lerp(currCamZ, wp.camZ, scrollSmooth);
+      currLookX = THREE.MathUtils.lerp(currLookX, wp.lookX, scrollSmooth);
+      currLookY = THREE.MathUtils.lerp(currLookY, wp.lookY, scrollSmooth);
+
+      // Apply to world root group (translating and rotating the entire botanical system organically)
+      world.rootGroup.position.set(currPosX, currPosY, currPosZ);
+      world.rootGroup.rotation.set(currRotX - 1.44, currRotY, currRotZ);
+      world.rootGroup.scale.set(currScale, currScale, currScale);
+
       // Update botanical world kinematics and bloom with smoothly interpolated scroll
       world.update(delta, elapsedTime, currentScrollFraction);
-      // Only trigger React state updates when bloom progress actually animates (eliminates 60fps re-render overhead)
-      if (Math.abs(lastProgress - world.bloomProgress) > 0.04 || (world.bloomProgress < 0.99 && lastProgress !== world.bloomProgress)) {
-        lastProgress = world.bloomProgress;
+
+      // Update HUD stage text only when the stage changes (prevents 60fps React re-renders)
+      const stage = getStageName(world.bloomProgress);
+      if (stage !== lastStageRef.current) {
+        lastStageRef.current = stage;
         setBloomProgress(world.bloomProgress);
       }
 
-      // Camera Tracking along the vertical botanical tree
-      // At scroll = 0: Camera at Y = 3.2 (Hero view on main flower)
-      // At scroll = 1: Camera descends to Y = -11.0 (Footer view with roots & branches)
-      const baseStartCamY = isMobile ? 2.6 : 3.2;
-      const baseStartCamZ = isMobile ? 5.2 : 5.8;
-      const targetCamY = THREE.MathUtils.lerp(baseStartCamY, -11.0, currentScrollFraction);
-      const targetLookY = THREE.MathUtils.lerp(baseStartCamY, -12.0, currentScrollFraction);
-      const targetCamZ = THREE.MathUtils.lerp(baseStartCamZ, 7.2, currentScrollFraction);
-
-      currentCamY = THREE.MathUtils.lerp(currentCamY, targetCamY, scrollSmooth);
-      currentLookY = THREE.MathUtils.lerp(currentLookY, targetLookY, scrollSmooth);
-      currentCamZ = THREE.MathUtils.lerp(currentCamZ, targetCamZ, scrollSmooth);
-
       // Subtle 3D parallax on camera
-      const parallaxX = mouse.x * 0.45;
-      const parallaxY = mouse.y * 0.35;
+      const parallaxX = mouse.x * 0.35;
+      const parallaxY = mouse.y * 0.25;
 
       camera.position.x = parallaxX;
-      camera.position.y = currentCamY + parallaxY;
-      camera.position.z = currentCamZ;
+      camera.position.y = currCamY + parallaxY;
+      camera.position.z = currCamZ;
 
-      camera.lookAt(new THREE.Vector3(parallaxX * 0.3, currentLookY, 0));
+      camera.lookAt(new THREE.Vector3(currLookX + parallaxX * 0.2, currLookY + parallaxY * 0.2, 0));
 
       if (renderModeRef.current === "ascii") {
         if (world.particlesMesh) world.particlesMesh.visible = false;
+        // Project flower center into screen coordinates to anchor ASCII core lighting & highlights
+        world.mainFlowerGroup.getWorldPosition(flowerWorldPos);
+        flowerWorldPos.project(camera);
+        const screenX = flowerWorldPos.x * 0.5 + 0.5;
+        const screenY = flowerWorldPos.y * 0.5 + 0.5;
+        asciiPass.setFlowerScreenPosition(screenX, screenY);
         asciiPass.render(scene, camera, elapsedTime);
       } else {
         if (world.particlesMesh) world.particlesMesh.visible = true;

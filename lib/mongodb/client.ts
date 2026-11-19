@@ -9,6 +9,14 @@ const DEFAULT_DB_NAME = "codebloom";
 export function isMongoConfigured(): boolean {
   const uri = process.env.MONGODB_URI;
   if (!uri) return false;
+  if (
+    uri.includes("<username>") ||
+    uri.includes("<password>") ||
+    uri.includes("<your-") ||
+    uri.includes("placeholder")
+  ) {
+    return false;
+  }
   return uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://");
 }
 
@@ -25,13 +33,19 @@ export async function getMongoClient(): Promise<MongoClient> {
 
   if (process.env.NODE_ENV === "development") {
     if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri);
+      const client = new MongoClient(uri, {
+        serverSelectionTimeoutMS: 2500,
+        connectTimeoutMS: 2500,
+      });
       global._mongoClientPromise = client.connect();
     }
     return global._mongoClientPromise;
   }
 
-  const client = new MongoClient(uri);
+  const client = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 2500,
+    connectTimeoutMS: 2500,
+  });
   return client.connect();
 }
 

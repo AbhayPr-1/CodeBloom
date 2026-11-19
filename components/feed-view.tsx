@@ -29,16 +29,23 @@ const emptyLiveProjects: LiveProject[] = [];
 
 export function FeedView({ mode = "home", initialQuery = "", authConfirmed = false, welcome = false }: { mode?: "home" | "explore"; initialQuery?: string; authConfirmed?: boolean; welcome?: boolean }) {
   const { projects } = useCommunity();
-  const [filter, setFilter] = useState<PreviewFeedMode>("For you");
+  const [filter, setFilter] = useState<PreviewFeedMode | "Bookmarks">("For you");
   const [query, setQuery] = useState(initialQuery);
+  const [retryCount, setRetryCount] = useState(0);
   const [liveResult, setLiveResult] = useState<{ key: string; projects: LiveProject[]; error: string }>({ key: "", projects: [], error: "" });
   const isDashboard = mode === "home";
-  const requestKey = `${filter}\u0000${query}`;
+  const requestKey = `${filter}\u0000${query}\u0000${retryCount}`;
   const liveLoading = isDashboard && liveResult.key !== requestKey;
   const liveError = liveResult.key === requestKey ? liveResult.error : "";
   const liveProjects = liveResult.key === requestKey ? liveResult.projects : emptyLiveProjects;
-  const visible = useMemo(() => isDashboard ? sortLiveFeed(liveProjects, filter as LiveFeedMode, query) : getPreviewFeed(projects, filter, query), [filter, isDashboard, liveProjects, projects, query]);
+  const visible = useMemo(() => isDashboard ? sortLiveFeed(liveProjects, filter as LiveFeedMode, query) : getPreviewFeed(projects, filter as PreviewFeedMode, query), [filter, isDashboard, liveProjects, projects, query]);
   const title = mode === "explore" ? "Explore projects" : "The community garden";
+  const filters: readonly (PreviewFeedMode | "Bookmarks")[] = isDashboard ? [...previewFeedModes, "Bookmarks"] : previewFeedModes;
+  const emptyCopy = filter === "Bookmarks"
+    ? { title: "No saved projects yet", description: "Bookmark a published project and it will be collected here across sessions.", action: "Browse projects", href: "/explore" }
+    : filter === "Following"
+    ? { title: "Your following feed is ready to grow", description: "Follow a creator from a project card and their published work will appear here.", action: "Explore projects", href: "/explore" }
+    : { title: "No live projects yet", description: "When members publish projects, they will appear here. You can be among the first to share one.", action: "Share a project", href: "/publish" };
 
   useEffect(() => {
     if (!isDashboard) return;
@@ -58,15 +65,15 @@ export function FeedView({ mode = "home", initialQuery = "", authConfirmed = fal
     return () => controller.abort();
   }, [filter, isDashboard, query, requestKey]);
 
-  return <section className="feed-view">
+  return <section className="feed-view" aria-busy={isDashboard && liveLoading}>
     {mode === "home" && (welcome || authConfirmed) && <DashboardWelcome emailConfirmed={authConfirmed} />}
     <PageHeading eyebrow={mode === "explore" ? "DISCOVER WHAT'S GROWING" : "GOOD WORK, SHARED OPENLY"} title={title} description={mode === "explore" ? "Find the tools, experiments, and open-source work people are building." : "Published projects from the CodeBloom community, with live votes, saves, and conversation."} action={<Link href="/publish" className="button button-primary"><Plus size={16} /> Share a project</Link>} />
-    <div className="feed-toolbar"><div className="tabs" role="group" aria-label={isDashboard ? "Sort the live project feed" : "Sort the preview feed"}>{previewFeedModes.map((item) => <button type="button" key={item} className={filter === item ? "tab-active" : ""} aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>)}</div>{mode === "explore" && <label className="inline-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search projects</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects" /></label>}</div>
+    <div className="feed-toolbar"><div className="tabs" role="group" aria-label={isDashboard ? "Sort the live project feed" : "Sort the preview feed"}>{filters.map((item) => <button type="button" key={item} className={filter === item ? "tab-active" : ""} aria-pressed={filter === item} onClick={() => setFilter(item)}>{item}</button>)}</div>{mode === "explore" && <label className="inline-search"><Search size={15} aria-hidden="true" /><span className="sr-only">Search projects</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects" /></label>}</div>
     {isDashboard && liveLoading ? <div className="feed-status" role="status"><span className="spinner" aria-hidden="true" /> Loading live projects…</div> : null}
-    {isDashboard && !liveLoading && liveError ? <div className="error-banner" role="alert">{liveError}</div> : null}
+    {isDashboard && !liveLoading && liveError ? <div className="feed-error" role="alert"><p className="error-banner">{liveError}</p><button className="button button-outline" type="button" onClick={() => setRetryCount((count) => count + 1)}>Try again</button></div> : null}
     {!isDashboard && filter === "Following" ? <EmptyState icon={<Users size={24} />} title="Your following feed starts here" description="Follow creators from a live project card to build this feed." action={<Link className="button button-outline" href="/explore"><Compass size={15} /> Explore projects</Link>} /> : null}
     {!liveLoading && !liveError && (isDashboard || filter !== "Following") && visible.length ? <div className="feed-list" aria-live="polite">{visible.map((project) => <ProjectCard key={project.slug} project={project} liveProject={isDashboard ? project as LiveProject : undefined} />)}</div> : null}
-    {isDashboard && !liveLoading && !liveError && visible.length === 0 ? <EmptyState icon={<Compass size={24} />} title={filter === "Following" ? "Your following feed is ready to grow" : "No live projects yet"} description={filter === "Following" ? "Follow a creator from a project card and their published work will appear here." : "When members publish projects, they will appear here. You can be among the first to share one."} action={<Link className="button button-outline" href="/publish"><Plus size={15} /> Share a project</Link>} /> : null}
+    {isDashboard && !liveLoading && !liveError && visible.length === 0 ? <EmptyState icon={filter === "Bookmarks" ? <Bookmark size={24} /> : <Compass size={24} />} title={emptyCopy.title} description={emptyCopy.description} action={<Link className="button button-outline" href={emptyCopy.href}>{emptyCopy.href === "/publish" ? <Plus size={15} /> : <Compass size={15} />} {emptyCopy.action}</Link>} /> : null}
     {!isDashboard && filter !== "Following" && visible.length === 0 ? <EmptyState icon={<Search size={24} />} title="No projects found" description="Try another project name, developer, or technology." action={query ? <button className="button button-outline" type="button" onClick={() => setQuery("")}>Clear search</button> : undefined} /> : null}
     {isDashboard ? <p className="live-feed-note">Live feed · public published projects · private account actions</p> : <PreviewNote>Feed order and sample projects are local preview data, not the production ranking or a live community feed.</PreviewNote>}
   </section>;

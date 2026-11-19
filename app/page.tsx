@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import { LandingPage } from "@/components/landing-page";
-import { getAuthenticatedUser } from "@/lib/auth";
 import { createPublicPageMetadata } from "@/lib/seo";
 import "./landing.css";
 
@@ -10,7 +8,6 @@ export const metadata = createPublicPageMetadata(
   "/",
 );
 
-export default async function HomePage() {
-  if (await getAuthenticatedUser()) redirect("/dashboard");
+export default function HomePage() {
   return <LandingPage />;
 }

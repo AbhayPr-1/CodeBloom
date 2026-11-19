@@ -125,18 +125,18 @@ export class BotanicalWorld {
    */
   private buildMainFlower() {
     const tierConfigs = [
-      // Tier 0: Innermost tight core petals (bright mint)
-      { count: 14, length: 0.85, width: 0.38, arch: 0.25, cup: 0.35, tiltOpen: 0.45, tiltClosed: 0.08, delay: 0.55, dur: 0.35, scale: 0.9 },
+      // Tier 0: Innermost tight core petals — begins unfurling immediately
+      { count: 14, length: 0.85, width: 0.38, arch: 0.25, cup: 0.35, tiltOpen: 0.45, tiltClosed: 0.08, delay: 0.02, dur: 0.45, scale: 0.9 },
       // Tier 1: Inner delicate petals
-      { count: 16, length: 1.25, width: 0.48, arch: 0.35, cup: 0.30, tiltOpen: 0.72, tiltClosed: 0.12, delay: 0.58, dur: 0.35, scale: 1.0 },
+      { count: 16, length: 1.25, width: 0.48, arch: 0.35, cup: 0.30, tiltOpen: 0.72, tiltClosed: 0.12, delay: 0.14, dur: 0.48, scale: 1.0 },
       // Tier 2: Mid-inner petals
-      { count: 18, length: 1.70, width: 0.62, arch: 0.45, cup: 0.26, tiltOpen: 0.95, tiltClosed: 0.16, delay: 0.62, dur: 0.35, scale: 1.15 },
-      // Tier 3: Mid petals (radiant jade)
-      { count: 20, length: 2.20, width: 0.76, arch: 0.55, cup: 0.22, tiltOpen: 1.18, tiltClosed: 0.20, delay: 0.68, dur: 0.32, scale: 1.25 },
+      { count: 18, length: 1.70, width: 0.62, arch: 0.45, cup: 0.26, tiltOpen: 0.95, tiltClosed: 0.16, delay: 0.26, dur: 0.48, scale: 1.15 },
+      // Tier 3: Mid petals (radiant sapphire)
+      { count: 20, length: 2.20, width: 0.76, arch: 0.55, cup: 0.22, tiltOpen: 1.18, tiltClosed: 0.20, delay: 0.40, dur: 0.45, scale: 1.25 },
       // Tier 4: Outer large petals
-      { count: 22, length: 2.75, width: 0.92, arch: 0.65, cup: 0.18, tiltOpen: 1.42, tiltClosed: 0.24, delay: 0.74, dur: 0.26, scale: 1.35 },
-      // Tier 5: Outermost sweeping petals (deep green with glowing rims)
-      { count: 24, length: 3.35, width: 1.08, arch: 0.78, cup: 0.14, tiltOpen: 1.62, tiltClosed: 0.28, delay: 0.80, dur: 0.20, scale: 1.45 },
+      { count: 22, length: 2.75, width: 0.92, arch: 0.65, cup: 0.18, tiltOpen: 1.42, tiltClosed: 0.24, delay: 0.54, dur: 0.38, scale: 1.35 },
+      // Tier 5: Outermost sweeping petals (radiant glowing rims)
+      { count: 24, length: 3.35, width: 1.08, arch: 0.78, cup: 0.14, tiltOpen: 1.62, tiltClosed: 0.28, delay: 0.68, dur: 0.30, scale: 1.45 },
     ];
 
     tierConfigs.forEach((tier, tierIdx) => {
@@ -452,9 +452,9 @@ export class BotanicalWorld {
   private buildMiniFlower(parent: THREE.Group): PetalData[] {
     const petals: PetalData[] = [];
     const tiers = [
-      { count: 10, length: 1.0, width: 0.42, tiltOpen: 0.65, tiltClosed: 0.1, delay: 0.45, dur: 0.35, scale: 0.9 },
-      { count: 12, length: 1.4, width: 0.55, tiltOpen: 1.15, tiltClosed: 0.18, delay: 0.52, dur: 0.32, scale: 1.1 },
-      { count: 14, length: 1.8, width: 0.68, tiltOpen: 1.48, tiltClosed: 0.24, delay: 0.60, dur: 0.28, scale: 1.2 },
+      { count: 10, length: 1.0, width: 0.42, tiltOpen: 0.65, tiltClosed: 0.1, delay: 0.10, dur: 0.45, scale: 0.9 },
+      { count: 12, length: 1.4, width: 0.55, tiltOpen: 1.15, tiltClosed: 0.18, delay: 0.28, dur: 0.45, scale: 1.1 },
+      { count: 14, length: 1.8, width: 0.68, tiltOpen: 1.48, tiltClosed: 0.24, delay: 0.48, dur: 0.42, scale: 1.2 },
     ];
 
     tiers.forEach((t, tIdx) => {
@@ -569,28 +569,35 @@ export class BotanicalWorld {
   /**
    * Master Update Frame Loop
    */
-  public update(delta: number, elapsedTime: number, scrollProgress?: number) {
-    void scrollProgress;
+  public update(delta: number, elapsedTime: number, scrollProgress: number = 0) {
+    // Ensure bloom advances smoothly if user scrolls into the story before initial timer completes
+    const scrollBloom = Math.min(1.0, scrollProgress * 5.0);
+    const effectiveTargetBloom = Math.max(this.targetBloomProgress, scrollBloom);
+
     // Smooth bloom progression
-    if (this.bloomProgress < this.targetBloomProgress) {
+    if (this.bloomProgress < effectiveTargetBloom) {
       this.bloomProgress = Math.min(
-        this.targetBloomProgress,
+        effectiveTargetBloom,
         this.bloomProgress + delta * this.bloomSpeed
       );
-    } else if (this.bloomProgress > this.targetBloomProgress) {
+    } else if (this.bloomProgress > effectiveTargetBloom) {
       this.bloomProgress = Math.max(
-        this.targetBloomProgress,
+        effectiveTargetBloom,
         this.bloomProgress - delta * this.bloomSpeed
       );
     }
 
+    // Dynamic living botanical breath:
+    // Even when fully bloomed, the flower breathes with an organic, hypnotic pulse
+    const livingBreath = Math.sin(elapsedTime * 1.6) * 0.02;
+
     // Update uniform values across all materials
     this.materials.forEach((mat) => {
       if (mat.uniforms.uTime) mat.uniforms.uTime.value = elapsedTime;
-      if (mat.uniforms.uBloomProgress) mat.uniforms.uBloomProgress.value = this.bloomProgress;
+      if (mat.uniforms.uBloomProgress) mat.uniforms.uBloomProgress.value = Math.min(1.0, this.bloomProgress + livingBreath);
       if (mat.uniforms.uLightIntensity) {
         // Subtle, soothing lighting as blooming completes
-        mat.uniforms.uLightIntensity.value = 0.62 + 0.12 * this.bloomProgress;
+        mat.uniforms.uLightIntensity.value = 0.62 + 0.14 * this.bloomProgress;
       }
     });
 
@@ -622,11 +629,14 @@ export class BotanicalWorld {
       branch.group.rotation.z = branch.baseRot.z + sway;
     });
 
-    // Subtle breathing rotation on main flower facing the screen
-    const flowerBreath = Math.sin(elapsedTime * 0.8) * 0.02;
-    this.mainFlowerGroup.rotation.x = 1.44 + Math.sin(elapsedTime * 0.6) * 0.015;
-    this.mainFlowerGroup.rotation.y = flowerBreath;
-    this.mainFlowerGroup.rotation.z = Math.cos(elapsedTime * 0.6) * 0.015;
+    // Subtle breathing rotation on main flower facing the screen, responding gracefully to scroll
+    const flowerBreath = Math.sin(elapsedTime * 0.8) * 0.025;
+    const scrollYaw = (scrollProgress - 0.5) * 0.18;
+    const scrollPitch = Math.sin(scrollProgress * Math.PI) * 0.12;
+
+    this.mainFlowerGroup.rotation.x = 1.44 + Math.sin(elapsedTime * 0.6) * 0.02 + scrollPitch;
+    this.mainFlowerGroup.rotation.y = flowerBreath + scrollYaw;
+    this.mainFlowerGroup.rotation.z = Math.cos(elapsedTime * 0.6) * 0.02;
 
     // Stem growth scaling during bud-to-bloom Stage 1 & 2
     const stemGrowScale = Math.min(1.0, 0.4 + this.bloomProgress * 0.8);
@@ -683,11 +693,14 @@ export class BotanicalWorld {
       p.velocity.addScaledVector(_vAccel, delta);
       p.deflection.addScaledVector(p.velocity, delta);
 
-      // Apply combined rotation
+      // Living botanical breath animation — keeps the flower organically alive and blooming
+      const bloomBreath = Math.sin(elapsedTime * 1.6 + p.tier * 0.6) * 0.032 * ease;
+      const scaleBreath = 1.0 + Math.sin(elapsedTime * 1.6 + p.tier * 0.4) * 0.02 * ease;
+
       const breezeWave = Math.sin(elapsedTime * 2.2 + p.tier * 0.8) * 0.02 * ease;
-      p.pivot.rotation.x = currentPitch + breezeWave + p.deflection.z;
+      p.pivot.rotation.x = currentPitch + breezeWave + bloomBreath + p.deflection.z;
       p.pivot.rotation.z = p.deflection.x * 0.5;
-      p.pivot.scale.setScalar(currentScale);
+      p.pivot.scale.setScalar(currentScale * scaleBreath);
     });
   }
 

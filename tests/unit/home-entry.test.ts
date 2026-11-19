@@ -15,15 +15,8 @@ import { LandingPage } from "@/components/landing-page";
 describe("public root entry", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("sends an authenticated visitor to the dashboard", async () => {
-    getAuthenticatedUser.mockResolvedValue({ id: "member-1" });
-    await expect(HomePage()).rejects.toThrow("redirect:/dashboard");
-    expect(redirect).toHaveBeenCalledWith("/dashboard");
-  });
-
-  it("keeps the landing page public for guests", async () => {
-    getAuthenticatedUser.mockResolvedValue(null);
-    const result = await HomePage();
+  it("renders the landing page for all visitors", () => {
+    const result = HomePage();
     expect(result.type).toBe(LandingPage);
   });
 });

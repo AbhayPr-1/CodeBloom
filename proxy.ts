@@ -13,6 +13,12 @@ const protectedPaths = new Set([
 ]);
 
 export async function proxy(request: NextRequest) {
+  // Allow CodeBloom authenticated sessions through directly
+  const codebloomSession = request.cookies.get("codebloom_session")?.value;
+  if (codebloomSession) {
+    return NextResponse.next({ request });
+  }
+
   const supabaseConfig = getSupabaseConfig();
   if (!supabaseConfig) return NextResponse.next({ request });
   if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next({ request });

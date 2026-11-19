@@ -93,8 +93,9 @@ export class AsciiPostProcessor {
   ) {
     this.renderer = renderer;
 
-    const renderWidth = Math.max(1, Math.floor(width * dpr));
-    const renderHeight = Math.max(1, Math.floor(height * dpr));
+    const clampedDpr = Math.min(dpr, 1.5);
+    const renderWidth = Math.max(1, Math.floor(width * clampedDpr));
+    const renderHeight = Math.max(1, Math.floor(height * clampedDpr));
 
     // High precision render target for the 3D scene
     this.renderTarget = new THREE.WebGLRenderTarget(renderWidth, renderHeight, {
@@ -119,9 +120,10 @@ export class AsciiPostProcessor {
         uAsciiAtlas: { value: this.atlasInfo?.texture ?? null },
         uNumChars: { value: this.atlasInfo?.count ?? 16 },
         uResolution: { value: new THREE.Vector2(renderWidth, renderHeight) },
-        uCellSize: { value: new THREE.Vector2(baseCellX * dpr, baseCellY * dpr) },
+        uCellSize: { value: new THREE.Vector2(baseCellX * clampedDpr, baseCellY * clampedDpr) },
         uThemeMode: { value: theme === "light" ? 1.0 : 0.0 },
         uTime: { value: 0.0 },
+        uFlowerScreenPos: { value: new THREE.Vector2(0.5, 0.44) },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -138,6 +140,7 @@ export class AsciiPostProcessor {
         uniform vec2 uCellSize;
         uniform float uThemeMode;
         uniform float uTime;
+        uniform vec2 uFlowerScreenPos;
         varying vec2 vUv;
 
         void main() {
@@ -153,7 +156,7 @@ export class AsciiPostProcessor {
           // Discard empty background outside the 3D botanical scene.
           // Robust alpha cutoff eliminates drifting spore particles, subpixel edge noise,
           // and characters flickering or popping in and out around the flower boundary.
-          if (sceneColor.a < 0.22) {
+          if (sceneColor.a < 0.20) {
             discard;
           }
 
@@ -175,41 +178,28 @@ export class AsciiPostProcessor {
           float norm = smoothstep(0.03, 0.66, intensity);
           float density = pow(norm, 0.88) * clamp(sceneColor.a * 1.15, 0.0, 1.0);
 
-          // Multi-tap neighbor sampling for edge detection (petal boundaries & silhouettes)
+          // Streamlined 4-tap orthogonal neighbor sampling for fast 60/120fps edge detection
           vec2 cellStep = uCellSize / uResolution;
-          vec4 cL  = texture2D(uSceneTexture, cellCenterUv - vec2(cellStep.x, 0.0));
-          vec4 cR  = texture2D(uSceneTexture, cellCenterUv + vec2(cellStep.x, 0.0));
-          vec4 cU  = texture2D(uSceneTexture, cellCenterUv + vec2(0.0, cellStep.y));
-          vec4 cD  = texture2D(uSceneTexture, cellCenterUv - vec2(0.0, cellStep.y));
-          vec4 cLU = texture2D(uSceneTexture, cellCenterUv + vec2(-cellStep.x, cellStep.y));
-          vec4 cRU = texture2D(uSceneTexture, cellCenterUv + vec2(cellStep.x, cellStep.y));
-          vec4 cLD = texture2D(uSceneTexture, cellCenterUv - vec2(cellStep.x, -cellStep.y));
-          vec4 cRD = texture2D(uSceneTexture, cellCenterUv + vec2(cellStep.x, -cellStep.y));
+          vec4 cL = texture2D(uSceneTexture, cellCenterUv - vec2(cellStep.x, 0.0));
+          vec4 cR = texture2D(uSceneTexture, cellCenterUv + vec2(cellStep.x, 0.0));
+          vec4 cU = texture2D(uSceneTexture, cellCenterUv + vec2(0.0, cellStep.y));
+          vec4 cD = texture2D(uSceneTexture, cellCenterUv - vec2(0.0, cellStep.y));
 
-          // 5-point intra-cell sampling to detect if any part of the cell intersects an ink outline:
-          vec2 d = cellStep * 0.28;
-          vec4 s1 = texture2D(uSceneTexture, cellCenterUv + vec2( d.x,  d.y));
-          vec4 s2 = texture2D(uSceneTexture, cellCenterUv + vec2(-d.x,  d.y));
-          vec4 s3 = texture2D(uSceneTexture, cellCenterUv + vec2( d.x, -d.y));
-          vec4 s4 = texture2D(uSceneTexture, cellCenterUv + vec2(-d.x, -d.y));
+          float minNeighborAlpha = min(min(cL.a, cR.a), min(cU.a, cD.a));
+          bool isSilhouetteBorder = (sceneColor.a >= 0.22 && minNeighborAlpha < 0.18);
 
-          float minCellLum = min(lum, min(min(dot(s1.rgb, vec3(0.299, 0.587, 0.114)),
-                                              dot(s2.rgb, vec3(0.299, 0.587, 0.114))),
-                                          min(dot(s3.rgb, vec3(0.299, 0.587, 0.114)),
-                                              dot(s4.rgb, vec3(0.299, 0.587, 0.114)))));
-
-          float minNeighborAlpha = min(min(min(cL.a, cR.a), min(cU.a, cD.a)), min(min(cLU.a, cRU.a), min(cLD.a, cRD.a)));
-          bool isSilhouetteBorder = (sceneColor.a >= 0.25 && minNeighborAlpha < 0.18);
-
-          // Internal edge: samples the dark navy ink outline painted on each petal (lum < 0.22)
-          bool isInternalEdge = (minCellLum < 0.22 && sceneColor.a > 0.35);
+          // Internal edge detection: sample lum differences across cross-taps
+          float minNeighborLum = min(min(dot(cL.rgb, vec3(0.299, 0.587, 0.114)),
+                                         dot(cR.rgb, vec3(0.299, 0.587, 0.114))),
+                                     min(dot(cU.rgb, vec3(0.299, 0.587, 0.114)),
+                                         dot(cD.rgb, vec3(0.299, 0.587, 0.114))));
+          bool isInternalEdge = ((lum < 0.24 || minNeighborLum < 0.20) && sceneColor.a > 0.35);
 
           bool isPetalOutline = (isSilhouetteBorder || isInternalEdge);
 
-          // Flower central core: center region of screen where flower originates
-          vec2 screenCenter = vec2(0.5, 0.44);
-          float distToCenter = length((cellCenterUv - screenCenter) * vec2(1.0, uResolution.y / uResolution.x));
-          float isFlowerCore = (1.0 - smoothstep(0.04, 0.12, distToCenter)) * smoothstep(0.30, 0.70, sceneColor.a);
+          // Flower central core: tracks dynamic projected screen coordinate of flower center
+          float distToCenter = length((cellCenterUv - uFlowerScreenPos) * vec2(1.0, uResolution.y / uResolution.x));
+          float isFlowerCore = (1.0 - smoothstep(0.04, 0.13, distToCenter)) * smoothstep(0.30, 0.70, sceneColor.a);
 
           // In Light Mode:
           // Match the user reference blueprint where each petal is clearly delineated:
@@ -322,9 +312,16 @@ export class AsciiPostProcessor {
     }
   }
 
+  public setFlowerScreenPosition(x: number, y: number) {
+    if (this.postMaterial?.uniforms?.uFlowerScreenPos) {
+      this.postMaterial.uniforms.uFlowerScreenPos.value.set(x, y);
+    }
+  }
+
   public setSize(width: number, height: number, dpr: number) {
-    const renderWidth = Math.max(1, Math.floor(width * dpr));
-    const renderHeight = Math.max(1, Math.floor(height * dpr));
+    const clampedDpr = Math.min(dpr, 1.5);
+    const renderWidth = Math.max(1, Math.floor(width * clampedDpr));
+    const renderHeight = Math.max(1, Math.floor(height * clampedDpr));
 
     this.renderTarget.setSize(renderWidth, renderHeight);
     this.postMaterial.uniforms.uResolution.value.set(renderWidth, renderHeight);
@@ -332,7 +329,7 @@ export class AsciiPostProcessor {
     const isMobile = width < 768;
     const baseCellX = isMobile ? 7 : 8.5;
     const baseCellY = isMobile ? 12 : 14.5;
-    this.postMaterial.uniforms.uCellSize.value.set(baseCellX * dpr, baseCellY * dpr);
+    this.postMaterial.uniforms.uCellSize.value.set(baseCellX * clampedDpr, baseCellY * clampedDpr);
   }
 
   /**

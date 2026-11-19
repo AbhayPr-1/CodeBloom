@@ -88,22 +88,39 @@ export function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Fluid cursor-tracking coral spotlight across all interactive glassmorphic cards
+  // Fluid cursor-tracking coral spotlight across all interactive glassmorphic cards (RAF throttled for 120fps smooth scrolling)
   useEffect(() => {
+    let rafId: number | null = null;
+    let pendingTarget: HTMLElement | null = null;
+    let pendingX = 0;
+    let pendingY = 0;
+
     const handlePointerMove = (e: PointerEvent) => {
       const target = (e.target as HTMLElement)?.closest?.(
         ".scroll-story-step-copy, .screen-card, .scroll-story-header, .scroll-story-stage, .scroll-story-window, .scroll-story-project-card, .works-card, .nums-stage, .num, .trail-card, .sw-formcard, .discovery-note, .hero-metric, .top, .cb-hero-btn-secondary, .btn, .scroll-story-step"
-      );
-      if (target) {
-        const rect = target.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        (target as HTMLElement).style.setProperty("--mouse-x", `${x}px`);
-        (target as HTMLElement).style.setProperty("--mouse-y", `${y}px`);
+      ) as HTMLElement | null;
+      if (!target) return;
+
+      pendingTarget = target;
+      const rect = target.getBoundingClientRect();
+      pendingX = e.clientX - rect.left;
+      pendingY = e.clientY - rect.top;
+
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          if (pendingTarget) {
+            pendingTarget.style.setProperty("--mouse-x", `${pendingX}px`);
+            pendingTarget.style.setProperty("--mouse-y", `${pendingY}px`);
+          }
+          rafId = null;
+        });
       }
     };
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    return () => window.removeEventListener("pointermove", handlePointerMove);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {

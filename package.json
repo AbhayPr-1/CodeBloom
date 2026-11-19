@@ -7,7 +7,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/prepare-env.mjs",
-    "dev": "next dev --webpack -H 0.0.0.0",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",

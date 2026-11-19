@@ -6,9 +6,10 @@ import { useEffect, useState } from "react";
 interface CodeBloomLogoProps {
   className?: string;
   onClick?: () => void;
+  href?: string;
 }
 
-export function CodeBloomLogo({ className = "", onClick }: CodeBloomLogoProps) {
+export function CodeBloomLogo({ className = "", onClick, href = "/" }: CodeBloomLogoProps) {
   const [bloomed, setBloomed] = useState(false);
 
   useEffect(() => {
@@ -19,12 +20,26 @@ export function CodeBloomLogo({ className = "", onClick }: CodeBloomLogoProps) {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    onClick?.();
+    if (typeof window !== "undefined") {
+      if (window.location.pathname === "/" && href === "/") {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else if (href === "/") {
+        e.preventDefault();
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = "/";
+      }
+    }
+  };
+
   return (
     <Link
-      href="/"
+      href={href}
       id="home"
       aria-label="CodeBloom home"
-      onClick={onClick}
+      onClick={handleClick}
       className={`cb-logo ${bloomed ? "is-bloomed" : ""} ${className}`}
     >
       {/* Background botanical vine & leaf silhouettes (resembling Image 1) */}
